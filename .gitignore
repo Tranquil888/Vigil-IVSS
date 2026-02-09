@@ -146,6 +146,7 @@ Thumbs.db
 
 # Project specific
 *.log
+log.log
 temp/
 tmp/
 logs/
@@ -153,5 +154,29 @@ output/
 models/
 checkpoints/
 
+# Vigil specific - Data directories
+data/
+dataset/
+encodings.pickle
+
+# Vigil specific - Generated files
+*.avi
+*.mp4
+*.mov
+*.mkv
+recorded_videos/
+captured_frames/
+screenshots/
+
+# Vigil specific - Configuration backups
+settings_backup.db
+auth_backup.db
+objects_backup.db
+camera_backup.db
+events_backup.db
+
 # IDE specific
 .windsurf/
+
+# Development files
+REFACTORING_SUMMARY.md

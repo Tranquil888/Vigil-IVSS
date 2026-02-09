@@ -48,20 +48,54 @@ The system is designed to be a cost-effective, functional alternative to expensi
 - **GPU**: Optional - NVIDIA GPU with CUDA support for enhanced performance
 
 ### Dependencies
-Core dependencies are installed automatically during setup (see Installation section).
+Core dependencies are listed in `requirements.txt`. Install using:
+```bash
+pip install -r requirements.txt
+```
+
+For optimal performance with face recognition, use conda environment:
+```bash
+conda create -n dlib-cuda python=3.8
+conda activate dlib-cuda
+pip install -r requirements.txt
+```
 
 ## 🛠️ Installation
 
 ### Prerequisites
-
-(To be configured)
+- Python 3.8+ with pip
+- Conda (recommended for face recognition dependencies)
+- Git for cloning the repository
 
 ### Setup Steps
+1. **Clone Repository**:
+   ```bash
+   git clone <repository-url>
+   cd dozor-clone
+   ```
 
-(To be configured)
+2. **Install Dependencies**:
+   ```bash
+   # Using pip
+   pip install -r requirements.txt
+   
+   # Or using conda (recommended)
+   conda create -n dlib-cuda python=3.8
+   conda activate dlib-cuda
+   pip install -r requirements.txt
+   ```
+
+3. **Run Application**:
+   ```bash
+   # Modular version (recommended)
+   python main_new.py
+   
+   # Original version (legacy)
+   python main.py
+   ```
 
 ### First Run
-1. Launch the application using `python main.py`
+1. Launch the application using `python main_new.py`
 2. Create administrator account when prompted
 3. Configure camera settings in the administration panel
 4. Add objects/people to the recognition database
@@ -83,14 +117,82 @@ Core dependencies are installed automatically during setup (see Installation sec
 
 ## 📁 Project Structure
 
-(To be configured)
+### Modular Architecture (New)
+```
+vigil/
+├── __init__.py                 # Package initialization
+├── core/                       # Core application components
+│   ├── app.py                 # Main application controller
+│   └── exceptions.py          # Custom exception classes
+├── config/                     # Configuration management
+│   ├── constants.py           # Application constants
+│   └── settings.py            # Settings with database persistence
+├── database/                   # Database layer
+│   └── manager.py             # Database operations (4 databases)
+├── auth/                       # Authentication & authorization
+│   ├── authentication.py     # User authentication
+│   └── authorization.py      # Role-based access control
+├── gui/                        # Graphical user interface
+│   ├── main_window.py         # Primary GUI window
+│   └── dialogs/
+│       └── auth_dialog.py     # Authentication dialogs
+├── video/                      # Video processing
+│   ├── capture.py             # Video capture from cameras/files
+│   └── processing.py         # Frame processing and encoding
+├── recognition/                # Face/object recognition
+│   └── face_detector.py      # Face detection and recognition
+├── events/                     # Event logging
+│   └── logger.py             # Event logging and management
+└── utils/                      # Utilities
+    └── logging_config.py     # Centralized logging
+```
 
-### Key Modules
-- **main.py**: Primary GUI application with tkinter interface
+### Legacy Structure (Original)
+- **main.py**: Primary GUI application with tkinter interface (8,155 lines)
 - **webstreaming.py**: Flask-based video streaming server
 - **Database Layer**: SQLite databases for authentication, settings, and recognition data
 
-## 👥 License
+### Entry Points
+- **main_new.py**: New modular application (recommended)
+- **main.py**: Original monolithic application (preserved for compatibility)
+
+### Database Files
+- `data/setting.db`: Application settings and configuration
+- `data/authentication.db`: User authentication and roles
+- `data/objects.db`: Recognition profiles and object data
+- `data/camerasetting.db`: Camera configuration
+- `data/events.db`: Event logging and journaling
+
+### Configuration Files
+- `requirements.txt`: Python dependencies
+- `encodings.pickle`: Face recognition encodings (generated during training)
+- `log.log`: Application log file
+
+## � Recent Refactoring (2025-02-09)
+
+The application has undergone a major refactoring to improve maintainability, testability, and extensibility:
+
+### ✅ What Changed
+- **Modular Architecture**: Transformed 8,155-line monolithic `main.py` into focused modules
+- **Separation of Concerns**: Each module has a single responsibility
+- **Dependency Injection**: Removed global variables, improved testability
+- **Enhanced Error Handling**: Custom exceptions and structured logging
+- **Database Abstraction**: Unified database management layer
+- **Role-Based Security**: Comprehensive authentication and authorization system
+
+### 🚀 Benefits
+- **Maintainability**: Smaller, focused code files are easier to modify
+- **Testability**: Individual modules can be unit tested independently
+- **Performance**: Optimized resource management and lazy loading
+- **Extensibility**: New features can be added without touching core code
+- **Code Quality**: Better documentation, type hints, and error handling
+
+### 📁 Migration Path
+- **Backward Compatible**: All existing databases and settings preserved
+- **Dual Entry Points**: Both modular (`main_new.py`) and original (`main.py`) available
+- **Gradual Transition**: Can switch between versions during testing phase
+
+## �👥 License
 
 MIT License
 
