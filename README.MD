@@ -1,67 +1,99 @@
-Vigil (prev. Dozor): Intelligent Video Surveillance System
+# Vigil (prev. Dozor): Intelligent Video Surveillance System
+
 Vigil is an intelligent software solution designed for real-time video monitoring, object recognition, and event analysis. Developed using Python and Computer Vision technologies, it automates security processes by identifying faces and objects in video streams, logging events, and archiving data.
 
 The system is designed to be a cost-effective, functional alternative to expensive enterprise security systems, making it suitable for small businesses, residential complexes, and educational institutions.
 
-📋 Table of Contents
-Features
+## 📋 Table of Contents
+- [Features](#-features)
+- [System Requirements](#-system-requirements)
+- [Installation](#-installation)
+- [Usage](#-usage)
+- [Project Structure](#-project-structure)
+- [License](#-license)
 
-System Requirements
+## 🚀 Features
 
-Installation
+### Real-Time Monitoring & Recognition
+- **Video Streaming**: Streams video from IP cameras or video files
+- **Face & Object Detection**: Detects and recognizes faces/objects using CNN or HOG models
+- **Smart Display**: Shows recognized object names and categories (e.g., "Resident", "Guest", "Attention!")
 
-Usage
+### Event Logging & Archiving
+- **Automatic Logging**: Logs events with timestamps and recognition confidence
+- **Media Capture**: Saves photo and video clips of specific events
+- **Searchable Journal**: Provides a searchable event log filterable by date or object
 
-Project Structure
+### Object Management
+- **Profile Management**: Create, edit, and delete observed objects (profiles)
+- **Dataset Management**: Manage photo datasets for model training directly within the interface
+- **Model Training**: Train the recognition model on new data
 
-Roadmap
+### Security & Administration
+- **Role-Based Access**: Administrator vs. Operator roles with different permissions
+- **Secure Authentication**: Secure login and session management
+- **Camera Configuration**: Camera connection settings and video quality adjustments
 
-Authors
+### Performance
+- **Multiprocessing**: Utilizes multiprocessing for smooth UI performance while processing video
+- **Hardware Acceleration**: Supports NVIDIA CUDA acceleration (Tensor Cores)
 
-🚀 Features
-The application provides a comprehensive suite of tools for security operators and administrators:
+## ⚙️ System Requirements
 
-Real-Time Monitoring & Recognition
-Streams video from IP cameras or video files.
+### Minimum Requirements
+- **Operating System**: Windows 10/11, Linux (Ubuntu 18.04+)
+- **Python**: 3.8 or higher
+- **RAM**: 4GB minimum, 8GB recommended
+- **Storage**: 10GB available space for application and data
+- **GPU**: Optional - NVIDIA GPU with CUDA support for enhanced performance
 
-Detects and recognizes faces/objects using CNN or HOG models.
+### Dependencies
+Core dependencies are installed automatically during setup (see Installation section).
 
-Displays recognized object names and categories (e.g., "Resident", "Guest", "Attention!").
+## 🛠️ Installation
 
-Event Logging & Archiving
-Automatically logs events with timestamps and recognition confidence.
+### Prerequisites
 
-Saves photo and video clips of specific events.
+(To be configured)
 
-Provides a searchable journal of events filterable by date or object.
+### Setup Steps
 
-Object Management
-Create, edit, and delete observed objects (profiles).
+(To be configured)
 
-Manage photo datasets for model training directly within the interface.
+### First Run
+1. Launch the application using `python main.py`
+2. Create administrator account when prompted
+3. Configure camera settings in the administration panel
+4. Add objects/people to the recognition database
 
-Train the recognition model on new data.
+## 📖 Usage
 
-Security & Administration
-Role-based access control (Administrator vs. Operator).
+### Basic Workflow
+1. **Login**: Use administrator credentials to access the system
+2. **Camera Setup**: Configure IP cameras or video sources in settings
+3. **Object Management**: Add profiles for people/objects to recognize
+4. **Monitoring**: Start real-time monitoring from the main dashboard
+5. **Review Events**: Check the event log for recognition activities
 
-Secure login and session management.
+### Key Operations
+- **Add New Object**: Navigate to Object Management → Add Profile
+- **Train Model**: Object Management → Train Model with new dataset
+- **View Events**: Event Log → Filter by date/object type
+- **Camera Settings**: Administration → Camera Configuration
 
-Camera connection settings and video quality adjustments.
+## 📁 Project Structure
 
-Performance
-Utilizes multiprocessing for smooth UI performance while processing video.
+(To be configured)
 
-Supports hardware acceleration via NVIDIA CUDA (Tensor Cores).
+### Key Modules
+- **main.py**: Primary GUI application with tkinter interface
+- **webstreaming.py**: Flask-based video streaming server
+- **Database Layer**: SQLite databases for authentication, settings, and recognition data
 
-System Requirements
-(To be filled with specific requirements, e.g., Python version, OS, dependencies.)
+## 👥 License
 
-Installation
-(To be filled with installation steps, e.g., clone repo, install dependencies, configure environment.)
+MIT License
 
-Usage
-(To be filled with basic usage instructions and examples.)
+---
 
-Project Structure
-(To be filled with a brief overview of the codebase directory and main modules.)
+**Note**: This software is intended for legitimate security and monitoring purposes. Users must comply with local laws and regulations regarding surveillance and privacy.
