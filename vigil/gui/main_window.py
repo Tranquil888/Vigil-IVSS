@@ -15,6 +15,7 @@ from vigil.utils.logging_config import get_ui_logger
 from vigil.video.capture import video_capture
 from vigil.video.processing import frame_processor
 from vigil.recognition.face_detector import face_detector
+from vigil.gui.dialogs.object_dialogs import AddObjectDialog, EditObjectDialog, DeleteObjectDialog
 from vigil.recognition.training_service import training_service
 from vigil.events.logger import event_logger
 from vigil.config.settings import settings
@@ -87,7 +88,7 @@ class MainWindow:
         objects_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Objects", menu=objects_menu)
         objects_menu.add_command(label="Add Object", command=self._add_object)
-        objects_menu.add_command(label="Object List", command=self._object_list)
+        objects_menu.add_command(label="Refresh Objects", command=self._refresh_objects_list)
         objects_menu.add_command(label="Train Model", command=self._train_model)
         
         # Camera menu
@@ -172,6 +173,9 @@ class MainWindow:
         self.objects_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.objects_frame, text="Objects")
         self._create_objects_tab()
+        
+        # Initialize objects list
+        self._refresh_objects_list()
     
     def _create_camera_tab(self) -> None:
         """Create the camera monitoring tab."""
@@ -313,7 +317,7 @@ class MainWindow:
         objects_frame.pack(fill='both', expand=True, padx=5, pady=5)
         
         # Create treeview for objects
-        columns = ("Name", "Category", "Last Seen", "Confidence")
+        columns = ("Name", "Category", "Phone", "Address", "Model Folder")
         self.objects_tree = ttk.Treeview(objects_frame, columns=columns, show='headings', height=15)
         
         for col in columns:
@@ -394,10 +398,99 @@ class MainWindow:
         messagebox.showinfo("User List", "User list feature coming soon")
     
     def _add_object(self) -> None:
-        messagebox.showinfo("Add Object", "Add object feature coming soon")
+        """Add a new object."""
+        try:
+            dialog = AddObjectDialog(self.root)
+            self.root.wait_window(dialog)
+            
+            if dialog.result:
+                self._refresh_objects_list()
+                self.logger.info(f"Added new object: {dialog.result.get_full_name()}")
+                
+        except Exception as e:
+            self.logger.error(f"Error adding object: {e}")
+            messagebox.showerror("Error", f"Failed to add object: {e}")
     
-    def _object_list(self) -> None:
-        messagebox.showinfo("Object List", "Object list feature coming soon")
+    def _edit_object(self) -> None:
+        """Edit selected object."""
+        try:
+            selected = self.objects_tree.selection()
+            if not selected:
+                messagebox.showwarning("No Selection", "Please select an object to edit")
+                return
+            
+            # Get model folder from tree
+            item = self.objects_tree.item(selected[0])
+            model_folder = item['values'][4] if len(item['values']) > 4 else ""
+            
+            if not model_folder:
+                messagebox.showwarning("Invalid Selection", "Cannot edit this object")
+                return
+            
+            dialog = EditObjectDialog(self.root, model_folder)
+            self.root.wait_window(dialog)
+            
+            if dialog.result:
+                self._refresh_objects_list()
+                self.logger.info(f"Updated object: {dialog.result.get_full_name()}")
+                
+        except Exception as e:
+            self.logger.error(f"Error editing object: {e}")
+            messagebox.showerror("Error", f"Failed to edit object: {e}")
+    
+    def _delete_object(self) -> None:
+        """Delete selected object."""
+        try:
+            selected = self.objects_tree.selection()
+            if not selected:
+                messagebox.showwarning("No Selection", "Please select an object to delete")
+                return
+            
+            # Get model folder from tree
+            item = self.objects_tree.item(selected[0])
+            model_folder = item['values'][4] if len(item['values']) > 4 else ""
+            object_name = item['values'][0] if len(item['values']) > 0 else "Unknown"
+            
+            if not model_folder:
+                messagebox.showwarning("Invalid Selection", "Cannot delete this object")
+                return
+            
+            dialog = DeleteObjectDialog(self.root, model_folder)
+            self.root.wait_window(dialog)
+            
+            if dialog.result:
+                self._refresh_objects_list()
+                self.logger.info(f"Deleted object: {object_name}")
+                
+        except Exception as e:
+            self.logger.error(f"Error deleting object: {e}")
+            messagebox.showerror("Error", f"Failed to delete object: {e}")
+    
+    def _refresh_objects_list(self) -> None:
+        """Refresh the objects list."""
+        try:
+            # Clear existing items
+            for item in self.objects_tree.get_children():
+                self.objects_tree.delete(item)
+            
+            # Load objects from service
+            from vigil.services.object_service import object_service
+            objects = object_service.get_all_objects()
+            
+            # Add objects to tree
+            for obj in objects:
+                name = obj.get_full_name()
+                category = obj.get_category_name()
+                phone = obj.phone or "N/A"
+                address = obj.get_address()
+                model_folder = obj.modelfolder
+                
+                self.objects_tree.insert('', 'end', values=(name, category, phone, address, model_folder))
+            
+            self.logger.info(f"Refreshed objects list with {len(objects)} objects")
+            
+        except Exception as e:
+            self.logger.error(f"Error refreshing objects list: {e}")
     
     def _train_model(self) -> None:
         if not authz_manager.can_train_model(self.current_role):
@@ -971,9 +1064,3 @@ class MainWindow:
             for item in self.events_tree.get_children():
                 self.events_tree.delete(item)
             self.status_label.config(text="Events cleared")
-    
-    def _edit_object(self) -> None:
-        messagebox.showinfo("Edit Object", "Edit object feature coming soon")
-    
-    def _delete_object(self) -> None:
-        messagebox.showinfo("Delete Object", "Delete object feature coming soon")

@@ -151,7 +151,15 @@ temp/
 tmp/
 logs/
 output/
-models/
+# ML model files (but not application model classes)
+*.pkl
+*.h5
+*.pb
+*.onnx
+*.pt
+*.pth
+trained_models/
+model_checkpoints/
 checkpoints/
 
 # Vigil specific - Data directories
@@ -183,3 +191,9 @@ REFACTORING_SUMMARY.md
 
 # Documentation files
 **/AGENTS.MD
+
+# Test files
+test_*.py
+debug_*.py
+*_test.py
+*_debug.py

@@ -88,6 +88,10 @@ def get_utils_logger() -> logging.Logger:
     """Get the utilities logger."""
     return vigil_logger.get_logger("vigil.utils")
 
+def get_service_logger() -> logging.Logger:
+    """Get the service logger."""
+    return vigil_logger.get_logger("vigil.service")
+
 
 # Export the main logging function
 def log_exception(logger: logging.Logger, error: Exception, context: str = "") -> None:
