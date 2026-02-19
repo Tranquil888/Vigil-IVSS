@@ -180,3 +180,6 @@ events_backup.db
 
 # Development files
 REFACTORING_SUMMARY.md
+
+# Documentation files
+**/AGENTS.MD
