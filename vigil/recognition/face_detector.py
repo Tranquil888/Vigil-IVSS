@@ -59,6 +59,7 @@ class FaceDetector:
                         # New format: dict of name -> encoding
                         self.face_encodings = data["encodings"]
                         self.face_names = list(self.face_encodings.keys())
+                        self.logger.info(f"Loaded new format with {len(self.face_names)} faces: {self.face_names}")
                     elif "encodings" in data and "names" in data:
                         # Old format: lists of encodings and names
                         encodings_list = data["encodings"]
@@ -69,6 +70,13 @@ class FaceDetector:
                                 self.face_encodings[name] = []
                             self.face_encodings[name].append(encoding)
                         self.face_names = list(self.face_encodings.keys())
+                        
+                        # Log details about loaded faces
+                        for face_name in self.face_names:
+                            encoding_count = len(self.face_encodings[face_name])
+                            self.logger.info(f"Loaded {encoding_count} encodings for '{face_name}'")
+                        
+                        self.logger.info(f"Loaded old format with {len(self.face_names)} faces: {self.face_names}")
                     
                     # Load additional settings if available
                     if "algorithm" in data:
@@ -162,6 +170,11 @@ class FaceDetector:
             # Encode faces
             face_encodings = self.encode_faces(frame, face_locations)
             
+            # Debug: Log detection info
+            self.logger.debug(f"Detected {len(face_locations)} faces, generated {len(face_encodings)} encodings")
+            self.logger.debug(f"Known faces in database: {list(self.face_encodings.keys())}")
+            self.logger.debug(f"Using tolerance: {tolerance}")
+            
             # Recognize faces
             recognized_faces = []
             
@@ -178,6 +191,8 @@ class FaceDetector:
                     else:
                         all_encodings.append(encodings)
                         all_names.append(name)
+                
+                self.logger.debug(f"Total known encodings: {len(all_encodings)}")
                 
                 if not all_encodings:
                     # No known faces, add as unknown
@@ -198,6 +213,9 @@ class FaceDetector:
                 name = "Unknown"
                 confidence = 0.0
                 
+                # Debug: Log comparison results
+                self.logger.debug(f"Matches: {matches}")
+                
                 if True in matches:
                     # Find best match
                     face_distances = face_recognition.face_distance(
@@ -209,6 +227,17 @@ class FaceDetector:
                     if matches[best_match_index]:
                         name = all_names[best_match_index]
                         confidence = 1.0 - face_distances[best_match_index]
+                        
+                        # Debug: Log successful recognition
+                        self.logger.debug(f"Recognized: {name} with confidence {confidence:.3f}, distance: {face_distances[best_match_index]:.3f}")
+                    else:
+                        # Debug: Log failed recognition despite matches
+                        self.logger.debug(f"Best match failed confidence check: distance={face_distances[best_match_index]:.3f}")
+                else:
+                    # Debug: Log no matches found
+                    if len(all_encodings) > 0:
+                        min_distance = np.min(face_recognition.face_distance(all_encodings, face_encoding))
+                        self.logger.debug(f"No matches found. Best distance: {min_distance:.3f}")
                 
                 recognized_faces.append({
                     'name': name,

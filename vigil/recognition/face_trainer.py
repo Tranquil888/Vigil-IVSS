@@ -128,8 +128,18 @@ class FaceTrainer:
                     
                     # Extract name from directory structure (remove prefix if present)
                     name = os.path.basename(os.path.dirname(image_path))
-                    if name.startswith("_"):  # Remove prefix if present
+                    # Remove common prefixes if present
+                    if name.startswith("_"):
                         name = name[13:] if len(name) > 13 else name
+                    elif name.startswith("dataset_"):
+                        name = name[8:]  # Remove "dataset_" prefix
+                    elif name.startswith("user_"):
+                        name = name[5:]   # Remove "user_" prefix
+                    
+                    # Clean up name
+                    name = name.strip().replace("_", " ").title()
+                    
+                    self.logger.debug(f"Processing image for person: '{name}' (original: '{os.path.basename(os.path.dirname(image_path))}')")
                     
                     # Convert BGR to RGB
                     rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)

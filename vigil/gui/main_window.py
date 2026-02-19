@@ -6,6 +6,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from PIL import Image, ImageTk
 import cv2
+import time
 from typing import Optional
 from vigil.gui.dialogs.auth_dialog import AuthenticationDialog
 from vigil.gui.dialogs.training_dialog import TrainingDialog
@@ -16,6 +17,7 @@ from vigil.video.processing import frame_processor
 from vigil.recognition.face_detector import face_detector
 from vigil.recognition.training_service import training_service
 from vigil.events.logger import event_logger
+from vigil.config.settings import settings
 
 
 class MainWindow:
@@ -30,6 +32,11 @@ class MainWindow:
         self.is_recording = False
         self.is_streaming = False
         self.current_frame = None
+        self.recognition_enabled = True
+        self.frame_count = 0
+        self.last_recognition_frame = 0
+        self.recognition_stats = {'total_faces': 0, 'recognized_faces': 0, 'unknown_faces': 0}
+        self.last_recognition_time = {}
         
         self._setup_window()
         self._create_widgets()
@@ -214,23 +221,61 @@ class MainWindow:
         )
         self.stop_recording_btn.pack(side='left', padx=2)
         
-        # Recognition info
-        info_frame = ttk.Frame(self.camera_frame)
-        info_frame.pack(fill='x', padx=5, pady=5)
+        # Recognition controls and info
+        recognition_frame = ttk.LabelFrame(self.camera_frame, text="Face Recognition")
+        recognition_frame.pack(fill='x', padx=5, pady=5)
+        
+        # Recognition controls row 1
+        controls_row1 = ttk.Frame(recognition_frame)
+        controls_row1.pack(fill='x', padx=5, pady=2)
+        
+        self.recognition_enabled_var = tk.BooleanVar(value=True)
+        self.recognition_enabled_cb = ttk.Checkbutton(
+            controls_row1,
+            text="Enable Recognition",
+            variable=self.recognition_enabled_var,
+            command=self._toggle_recognition
+        )
+        self.recognition_enabled_cb.pack(side='left', padx=5)
         
         self.recognition_label = ttk.Label(
-            info_frame, 
+            controls_row1, 
             text="Recognition: Inactive",
-            font=("Arial", 10)
+            font=("Arial", 10, "bold")
         )
-        self.recognition_label.pack(side='left', padx=5)
+        self.recognition_label.pack(side='left', padx=10)
         
         self.fps_label = ttk.Label(
-            info_frame, 
+            controls_row1, 
             text="FPS: 0",
             font=("Arial", 10)
         )
         self.fps_label.pack(side='right', padx=5)
+        
+        # Recognition controls row 2
+        controls_row2 = ttk.Frame(recognition_frame)
+        controls_row2.pack(fill='x', padx=5, pady=2)
+        
+        self.face_count_label = ttk.Label(
+            controls_row2,
+            text="Faces: 0",
+            font=("Arial", 9)
+        )
+        self.face_count_label.pack(side='left', padx=5)
+        
+        self.recognized_faces_label = ttk.Label(
+            controls_row2,
+            text="Recognized: None",
+            font=("Arial", 9)
+        )
+        self.recognized_faces_label.pack(side='left', padx=10)
+        
+        self.recognition_stats_label = ttk.Label(
+            controls_row2,
+            text="Accuracy: 0%",
+            font=("Arial", 9)
+        )
+        self.recognition_stats_label.pack(side='right', padx=5)
     
     def _create_events_tab(self) -> None:
         """Create the events monitoring tab."""
@@ -369,10 +414,164 @@ class MainWindow:
             messagebox.showerror("Error", f"Failed to open training dialog: {e}")
     
     def _camera_settings(self) -> None:
+        """Open camera and recognition settings dialog."""
         if not authz_manager.can_manage_cameras(self.current_role):
             messagebox.showerror("Access Denied", "You don't have permission to manage cameras")
             return
-        messagebox.showinfo("Camera Settings", "Camera settings feature coming soon")
+        
+        # Create settings dialog
+        settings_window = tk.Toplevel(self.root)
+        settings_window.title("Camera and Recognition Settings")
+        settings_window.geometry("500x600")
+        settings_window.resizable(False, False)
+        settings_window.transient(self.root)
+        settings_window.grab_set()
+        
+        # Create notebook for tabs
+        notebook = ttk.Notebook(settings_window)
+        notebook.pack(fill='both', expand=True, padx=10, pady=10)
+        
+        # Camera settings tab
+        camera_frame = ttk.Frame(notebook)
+        notebook.add(camera_frame, text="Camera")
+        
+        # Recognition settings tab
+        recognition_frame = ttk.Frame(notebook)
+        notebook.add(recognition_frame, text="Face Recognition")
+        
+        # === Camera Settings ===
+        ttk.Label(camera_frame, text="Camera Settings", font=("Arial", 12, "bold")).pack(pady=10)
+        
+        # Camera source
+        source_frame = ttk.Frame(camera_frame)
+        source_frame.pack(fill='x', padx=20, pady=5)
+        ttk.Label(source_frame, text="Camera Source:").pack(side='left')
+        camera_source_var = tk.StringVar(value=str(video_capture.camera_link or "0"))
+        ttk.Entry(source_frame, textvariable=camera_source_var, width=20).pack(side='left', padx=10)
+        
+        # Resolution
+        res_frame = ttk.Frame(camera_frame)
+        res_frame.pack(fill='x', padx=20, pady=5)
+        ttk.Label(res_frame, text="Resolution:").pack(side='left')
+        resolution_var = tk.StringVar(value=settings.get_setting('stream_res_qua', '704'))
+        ttk.Entry(res_frame, textvariable=resolution_var, width=10).pack(side='left', padx=10)
+        ttk.Label(res_frame, text="pixels").pack(side='left')
+        
+        # Quality
+        quality_frame = ttk.Frame(camera_frame)
+        quality_frame.pack(fill='x', padx=20, pady=5)
+        ttk.Label(quality_frame, text="Quality:").pack(side='left')
+        quality_var = tk.StringVar(value=settings.get_setting('stream_res_qua', '90').split(',')[1] if ',' in settings.get_setting('stream_res_qua', '90') else '90')
+        ttk.Entry(quality_frame, textvariable=quality_var, width=10).pack(side='left', padx=10)
+        ttk.Label(quality_frame, text("%").pack(side='left'))
+        
+        # === Recognition Settings ===
+        ttk.Label(recognition_frame, text="Face Recognition Settings", font=("Arial", 12, "bold")).pack(pady=10)
+        
+        # Enable recognition
+        enabled_frame = ttk.Frame(recognition_frame)
+        enabled_frame.pack(fill='x', padx=20, pady=10)
+        recognition_enabled_var = tk.BooleanVar(value=settings.get_setting('face_recognition_enabled', '1') == '1')
+        ttk.Checkbutton(enabled_frame, text="Enable Face Recognition", variable=recognition_enabled_var).pack(side='left')
+        
+        # Algorithm
+        algo_frame = ttk.Frame(recognition_frame)
+        algo_frame.pack(fill='x', padx=20, pady=5)
+        ttk.Label(algo_frame, text="Detection Algorithm:").pack(side='left')
+        algo_var = tk.StringVar(value=settings.get_setting('model_algorithm', 'cnn'))
+        algo_combo = ttk.Combobox(algo_frame, textvariable=algo_var, values=['cnn', 'hog'], state='readonly', width=15)
+        algo_combo.pack(side='left', padx=10)
+        
+        # Confidence threshold (actually tolerance for face_recognition library)
+        conf_frame = ttk.Frame(recognition_frame)
+        conf_frame.pack(fill='x', padx=20, pady=5)
+        ttk.Label(conf_frame, text="Recognition Tolerance:").pack(side='left')
+        conf_var = tk.StringVar(value=settings.get_setting('recognition_confidence_threshold', '0.6'))
+        conf_scale = ttk.Scale(conf_frame, from_=0.1, to=1.0, variable=tk.DoubleVar(value=float(conf_var.get())), 
+                              orient='horizontal', length=150)
+        conf_scale.pack(side='left', padx=10)
+        conf_label = ttk.Label(conf_frame, textvariable=conf_var, width=5)
+        conf_label.pack(side='left')
+        
+        def update_conf_label(value):
+            conf_var.set(f"{float(value):.2f}")
+        conf_scale.config(command=update_conf_label)
+        
+        # Add explanation label
+        ttk.Label(conf_frame, text="(0.1=strict, 0.8=lenient)", font=("Arial", 8)).pack(side='left', padx=5)
+        
+        # Frame skip
+        skip_frame = ttk.Frame(recognition_frame)
+        skip_frame.pack(fill='x', padx=20, pady=5)
+        ttk.Label(skip_frame, text="Process Every N Frames:").pack(side='left')
+        skip_var = tk.StringVar(value=settings.get_setting('recognition_frame_skip', '3'))
+        ttk.Spinbox(skip_frame, from_=1, to=30, textvariable=skip_var, width=10).pack(side='left', padx=10)
+        
+        # Cooldown period
+        cooldown_frame = ttk.Frame(recognition_frame)
+        cooldown_frame.pack(fill='x', padx=20, pady=5)
+        ttk.Label(cooldown_frame, text="Recognition Cooldown (sec):").pack(side='left')
+        cooldown_var = tk.StringVar(value=settings.get_setting('recognition_cooldown', '2'))
+        ttk.Spinbox(cooldown_frame, from_=0, to=60, textvariable=cooldown_var, width=10).pack(side='left', padx=10)
+        
+        # Show unknown faces
+        unknown_frame = ttk.Frame(recognition_frame)
+        unknown_frame.pack(fill='x', padx=20, pady=5)
+        unknown_var = tk.BooleanVar(value=settings.get_setting('show_unknown_faces', '1') == '1')
+        ttk.Checkbutton(unknown_frame, text="Show Unknown Face Alerts", variable=unknown_var).pack(side='left')
+        
+        # Model info
+        model_frame = ttk.LabelFrame(recognition_frame, text="Model Information")
+        model_frame.pack(fill='x', padx=20, pady=20)
+        
+        model_info = face_detector.get_model_info()
+        info_text = f"Trained: {'Yes' if model_info['is_trained'] else 'No'}\n"
+        info_text += f"Known Faces: {model_info['known_faces_count']}\n"
+        info_text += f"Algorithm: {model_info['algorithm']}\n"
+        info_text += f"Tolerance: {model_info['tolerance']}\n"
+        info_text += f"Model Path: {model_info['model_path']}"
+        
+        ttk.Label(model_frame, text=info_text, justify='left').pack(padx=10, pady=10)
+        
+        # Buttons
+        button_frame = ttk.Frame(settings_window)
+        button_frame.pack(fill='x', padx=10, pady=10)
+        
+        def save_settings():
+            try:
+                # Save camera settings
+                settings.set_setting('stream_res_qua', resolution_var.get(), quality_var.get())
+                
+                # Save recognition settings
+                settings.set_setting('face_recognition_enabled', '1' if recognition_enabled_var.get() else '0')
+                settings.set_setting('model_algorithm', algo_var.get())
+                settings.set_setting('recognition_confidence_threshold', conf_var.get())
+                settings.set_setting('recognition_frame_skip', skip_var.get())
+                settings.set_setting('recognition_cooldown', cooldown_var.get())
+                settings.set_setting('show_unknown_faces', '1' if unknown_var.get() else '0')
+                
+                # Update face detector settings
+                face_detector.set_algorithm(algo_var.get())
+                face_detector.set_tolerance(float(conf_var.get()))
+                
+                # Update runtime settings
+                self.recognition_enabled = recognition_enabled_var.get()
+                self.recognition_enabled_var.set(self.recognition_enabled)
+                
+                messagebox.showinfo("Success", "Settings saved successfully!")
+                settings_window.destroy()
+                
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save settings: {e}")
+        
+        ttk.Button(button_frame, text="Save", command=save_settings).pack(side='right', padx=5)
+        ttk.Button(button_frame, text="Cancel", command=settings_window.destroy).pack(side='right', padx=5)
+        
+        # Center dialog
+        settings_window.update_idletasks()
+        x = (settings_window.winfo_screenwidth() // 2) - (settings_window.winfo_width() // 2)
+        y = (settings_window.winfo_screenheight() // 2) - (settings_window.winfo_height() // 2)
+        settings_window.geometry(f"+{x}+{y}")
     
     def _start_recording(self) -> None:
         if not authz_manager.can_record_video(self.current_role):
@@ -432,8 +631,23 @@ class MainWindow:
                 video_capture.start_capture(self._process_frame)
                 
                 self.is_camera_running = True
+                self.frame_count = 0
+                self.last_recognition_frame = 0
+                self.recognition_stats = {'total_faces': 0, 'recognized_faces': 0, 'unknown_faces': 0}
+                self.last_recognition_time = {}
+                
+                # Load recognition settings
+                self.recognition_enabled = settings.get_setting('face_recognition_enabled', '1') == '1'
+                self.recognition_enabled_var.set(self.recognition_enabled)
+                
                 self.status_label.config(text="Camera started")
-                self.recognition_label.config(text="Recognition: Active")
+                
+                if self.recognition_enabled and face_detector.is_trained():
+                    self.recognition_label.config(text="Recognition: Active")
+                elif self.recognition_enabled:
+                    self.recognition_label.config(text="Recognition: No Model")
+                else:
+                    self.recognition_label.config(text="Recognition: Disabled")
                 
                 # Update button states
                 self.start_camera_btn.config(state='disabled')
@@ -460,6 +674,9 @@ class MainWindow:
             self.status_label.config(text="Camera stopped")
             self.recognition_label.config(text="Recognition: Inactive")
             self.fps_label.config(text="FPS: 0")
+            self.face_count_label.config(text="Faces: 0")
+            self.recognized_faces_label.config(text="Recognized: None")
+            self.recognition_stats_label.config(text="Accuracy: 0%")
             
             # Clear video canvas
             self.video_canvas.delete("all")
@@ -480,31 +697,81 @@ class MainWindow:
         except Exception as e:
             self.logger.error(f"Error stopping camera: {e}")
     
+    def _toggle_recognition(self) -> None:
+        """Toggle face recognition on/off."""
+        self.recognition_enabled = self.recognition_enabled_var.get()
+        
+        if self.is_camera_running:
+            if self.recognition_enabled:
+                self.recognition_label.config(text="Recognition: Active")
+                event_logger.log_system_event('recognition_enabled', 'Face recognition enabled')
+            else:
+                self.recognition_label.config(text="Recognition: Disabled")
+                event_logger.log_system_event('recognition_disabled', 'Face recognition disabled')
+        
+        self.logger.info(f"Face recognition {'enabled' if self.recognition_enabled else 'disabled'}")
+    
     def _process_frame(self, frame) -> None:
         """Process video frame for display and recognition."""
         try:
             self.current_frame = frame.copy()
+            self.frame_count += 1
             
-            # Perform face recognition if enabled
-            if face_detector.is_trained():
-                recognized_faces = face_detector.recognize_faces(frame)
+            # Get recognition settings
+            frame_skip = int(settings.get_setting('recognition_frame_skip', '3'))
+            confidence_threshold = float(settings.get_setting('recognition_confidence_threshold', '0.7'))
+            cooldown_period = int(settings.get_setting('recognition_cooldown', '2'))
+            
+            # Initialize variables for this frame
+            recognized_faces = []
+            current_time = time.time()
+            
+            # Perform face recognition if enabled and trained
+            if (self.recognition_enabled and 
+                face_detector.is_trained() and 
+                (self.frame_count - self.last_recognition_frame) >= frame_skip):
+                
+                self.last_recognition_frame = self.frame_count
+                
+                # Recognize faces with confidence threshold
+                # Use the tolerance directly from settings, not inverted confidence
+                tolerance = float(confidence_threshold) if confidence_threshold > 0.5 else 0.6
+                recognized_faces = face_detector.recognize_faces(frame, tolerance=tolerance)
+                
+                # Filter faces based on confidence and cooldown
+                filtered_faces = []
+                for face in recognized_faces:
+                    face_name = face['name']
+                    confidence = face['confidence']
+                    
+                    # Check cooldown period for recognized faces
+                    if face_name != 'Unknown':
+                        last_time = self.last_recognition_time.get(face_name, 0)
+                        if current_time - last_time >= cooldown_period:
+                            filtered_faces.append(face)
+                            self.last_recognition_time[face_name] = current_time
+                            
+                            # Log recognition event
+                            event_logger.log_face_recognition(
+                                face_name, 
+                                confidence,
+                                camera_source=str(video_capture.current_source)
+                            )
+                    else:
+                        # Always log unknown faces (or implement separate cooldown)
+                        filtered_faces.append(face)
+                        event_logger.log_unknown_face(
+                            confidence,
+                            camera_source=str(video_capture.current_source)
+                        )
+                
+                recognized_faces = filtered_faces
+                
+                # Update statistics
+                self._update_recognition_stats(recognized_faces)
                 
                 # Draw face boxes on frame
                 frame = face_detector.draw_face_boxes(frame, recognized_faces)
-                
-                # Log recognition events
-                for face in recognized_faces:
-                    if face['name'] != 'Unknown':
-                        event_logger.log_face_recognition(
-                            face['name'], 
-                            face['confidence'],
-                            camera_source=str(video_capture.current_source)
-                        )
-                    else:
-                        event_logger.log_unknown_face(
-                            face['confidence'],
-                            camera_source=str(video_capture.current_source)
-                        )
             
             # Convert frame for display
             frame_rgb = frame_processor.convert_color_space(frame, cv2.COLOR_BGR2RGB)
@@ -529,12 +796,52 @@ class MainWindow:
                 y = (canvas_height - frame_pil.height) // 2
                 self.video_canvas.create_image(x, y, anchor='nw', image=frame_photo)
             
-            # Update FPS display
-            fps = video_capture.get_fps()
-            self.fps_label.config(text=f"FPS: {fps:.1f}")
+            # Update displays
+            self._update_status_displays(recognized_faces)
             
         except Exception as e:
             self.logger.error(f"Error processing frame: {e}")
+    
+    def _update_recognition_stats(self, recognized_faces: list) -> None:
+        """Update recognition statistics."""
+        self.recognition_stats['total_faces'] += len(recognized_faces)
+        
+        for face in recognized_faces:
+            if face['name'] != 'Unknown':
+                self.recognition_stats['recognized_faces'] += 1
+            else:
+                self.recognition_stats['unknown_faces'] += 1
+    
+    def _update_status_displays(self, recognized_faces: list) -> None:
+        """Update status displays with current information."""
+        try:
+            # Update FPS
+            fps = video_capture.get_fps()
+            self.fps_label.config(text=f"FPS: {fps:.1f}")
+            
+            # Update face count
+            face_count = len(recognized_faces)
+            self.face_count_label.config(text=f"Faces: {face_count}")
+            
+            # Update recognized faces list
+            if recognized_faces:
+                recognized_names = [face['name'] for face in recognized_faces if face['name'] != 'Unknown']
+                if recognized_names:
+                    unique_names = list(set(recognized_names))
+                    self.recognized_faces_label.config(text=f"Recognized: {', '.join(unique_names[:3])}")
+                else:
+                    self.recognized_faces_label.config(text="Recognized: Unknown faces only")
+            else:
+                self.recognized_faces_label.config(text="Recognized: None")
+            
+            # Update accuracy
+            total = self.recognition_stats['total_faces']
+            if total > 0:
+                accuracy = (self.recognition_stats['recognized_faces'] / total) * 100
+                self.recognition_stats_label.config(text=f"Accuracy: {accuracy:.1f}%")
+            
+        except Exception as e:
+            self.logger.error(f"Error updating status displays: {e}")
     
     def _start_recording(self) -> None:
         """Start video recording."""

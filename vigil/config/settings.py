@@ -67,6 +67,13 @@ class SettingsManager:
                 ('archive_path', os.path.join(os.getcwd(), 'data', 'data_archives', 'dataset_archives'), None, None, None, None, None, None, None, None, None),  # Archive path
                 ('auto_retrain', '0', None, None, None, None, None, None, None, None, None),  # Auto retrain on dataset changes
                 ('min_images_per_person', '5', None, None, None, None, None, None, None, None, None),  # Minimum images required per person
+                # Face recognition runtime settings
+                ('face_recognition_enabled', '1', None, None, None, None, None, None, None, None, None),  # Enable/disable face recognition
+                ('recognition_confidence_threshold', '0.6', None, None, None, None, None, None, None, None, None),  # Recognition tolerance (0.1=strict, 0.8=lenient)
+                ('recognition_frame_skip', '3', None, None, None, None, None, None, None, None, None),  # Process every Nth frame for recognition
+                ('recognition_cooldown', '2', None, None, None, None, None, None, None, None, None),  # Seconds between recognition events for same person
+                ('show_unknown_faces', '1', None, None, None, None, None, None, None, None, None),  # Show unknown face alerts
+                ('recognition_roi_enabled', '0', None, None, None, None, None, None, None, None, None),  # Enable region of interest for recognition
             ]
             
             for default in defaults:
