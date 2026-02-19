@@ -7,6 +7,7 @@ from tkinter import ttk, messagebox
 from PIL import Image, ImageTk
 import cv2
 import time
+from time import strftime
 from typing import Optional
 from vigil.gui.dialogs.auth_dialog import AuthenticationDialog
 from vigil.gui.dialogs.training_dialog import TrainingDialog
@@ -38,6 +39,10 @@ class MainWindow:
         self.last_recognition_frame = 0
         self.recognition_stats = {'total_faces': 0, 'recognized_faces': 0, 'unknown_faces': 0}
         self.last_recognition_time = {}
+        self._last_filtered_faces = []  # Store last filtered results for stable display
+        self._last_recognition_update = 0  # Throttle recognition display updates
+        self._current_frame_photo = None
+        self._last_frame_time = None  # Initialize FPS tracking
         
         self._setup_window()
         self._create_widgets()
@@ -143,7 +148,6 @@ class MainWindow:
         self.status_label.pack(side='left', fill='x', expand=True, padx=2, pady=2)
         
         # Time label
-        from time import strftime
         def update_time():
             time_str = strftime("%Y-%m-%d %H:%M:%S")
             self.time_label.config(text=time_str)
@@ -748,6 +752,9 @@ class MainWindow:
                 self.last_recognition_frame = 0
                 self.recognition_stats = {'total_faces': 0, 'recognized_faces': 0, 'unknown_faces': 0}
                 self.last_recognition_time = {}
+                self._last_filtered_faces = []  # Store last filtered results for stable display
+                self._last_recognition_update = 0  # Throttle recognition display updates
+                self._last_frame_time = float(time.time())  # Initialize FPS tracking with actual time value
                 
                 # Load recognition settings
                 self.recognition_enabled = settings.get_setting('face_recognition_enabled', '1') == '1'
@@ -837,7 +844,10 @@ class MainWindow:
             
             # Initialize variables for this frame
             recognized_faces = []
-            current_time = time.time()
+            try:
+                current_time = float(time.time())
+            except (TypeError, ValueError):
+                current_time = 0.0
             
             # Perform face recognition if enabled and trained
             if (self.recognition_enabled and 
@@ -847,29 +857,33 @@ class MainWindow:
                 self.last_recognition_frame = self.frame_count
                 
                 # Recognize faces with confidence threshold
-                # Use the tolerance directly from settings, not inverted confidence
+                # Use tolerance directly from settings, not inverted confidence
                 tolerance = float(confidence_threshold) if confidence_threshold > 0.5 else 0.6
-                recognized_faces = face_detector.recognize_faces(frame, tolerance=tolerance)
+                raw_recognized_faces = face_detector.recognize_faces(frame, tolerance=tolerance)
                 
                 # Filter faces based on confidence and cooldown
                 filtered_faces = []
-                for face in recognized_faces:
+                for face in raw_recognized_faces:
                     face_name = face['name']
                     confidence = face['confidence']
                     
                     # Check cooldown period for recognized faces
                     if face_name != 'Unknown':
-                        last_time = self.last_recognition_time.get(face_name, 0)
-                        if current_time - last_time >= cooldown_period:
+                        try:
+                            last_time = float(self.last_recognition_time.get(face_name, 0))
+                            if float(time.time()) - last_time >= cooldown_period:
+                                filtered_faces.append(face)
+                                self.last_recognition_time[face_name] = float(time.time())
+                                
+                                # Log recognition event
+                                event_logger.log_face_recognition(
+                                    face_name, 
+                                    confidence,
+                                    camera_source=str(video_capture.current_source)
+                                )
+                        except (TypeError, ValueError):
+                            # If time operations fail, just add the face without cooldown
                             filtered_faces.append(face)
-                            self.last_recognition_time[face_name] = current_time
-                            
-                            # Log recognition event
-                            event_logger.log_face_recognition(
-                                face_name, 
-                                confidence,
-                                camera_source=str(video_capture.current_source)
-                            )
                     else:
                         # Always log unknown faces (or implement separate cooldown)
                         filtered_faces.append(face)
@@ -878,12 +892,14 @@ class MainWindow:
                             camera_source=str(video_capture.current_source)
                         )
                 
-                recognized_faces = filtered_faces
+                # Store both raw and filtered results
+                recognized_faces = raw_recognized_faces  # For display
+                self._last_filtered_faces = filtered_faces  # For stats and logging
                 
-                # Update statistics
-                self._update_recognition_stats(recognized_faces)
+                # Update statistics based on filtered faces
+                self._update_recognition_stats(filtered_faces)
                 
-                # Draw face boxes on frame
+                # Draw face boxes on frame using raw faces for visual consistency
                 frame = face_detector.draw_face_boxes(frame, recognized_faces)
             
             # Convert frame for display
@@ -897,20 +913,14 @@ class MainWindow:
                 frame_pil = Image.fromarray(frame_rgb)
                 frame_pil.thumbnail((canvas_width, canvas_height), Image.Resampling.LANCZOS)
                 
-                # Convert to PhotoImage and display
+                # Convert to PhotoImage
                 frame_photo = ImageTk.PhotoImage(frame_pil)
                 
-                # Keep reference to prevent garbage collection
-                self.video_canvas.image = frame_photo
+                # Store reference to prevent garbage collection
+                self.current_frame_photo = frame_photo
                 
-                # Center image on canvas
-                self.video_canvas.delete("all")
-                x = (canvas_width - frame_pil.width) // 2
-                y = (canvas_height - frame_pil.height) // 2
-                self.video_canvas.create_image(x, y, anchor='nw', image=frame_photo)
-            
-            # Update displays
-            self._update_status_displays(recognized_faces)
+                # Update canvas in main thread
+                self.root.after_idle(self._update_video_display, frame_photo, recognized_faces)
             
         except Exception as e:
             self.logger.error(f"Error processing frame: {e}")
@@ -925,27 +935,107 @@ class MainWindow:
             else:
                 self.recognition_stats['unknown_faces'] += 1
     
-    def _update_status_displays(self, recognized_faces: list) -> None:
-        """Update status displays with current information."""
+    def _update_video_display(self, frame_photo, recognized_faces) -> None:
+        """Update video display in main thread."""
         try:
-            # Update FPS
-            fps = video_capture.get_fps()
-            self.fps_label.config(text=f"FPS: {fps:.1f}")
+            canvas_width = self.video_canvas.winfo_width()
+            canvas_height = self.video_canvas.winfo_height()
             
-            # Update face count
+            if canvas_width > 1 and canvas_height > 1:
+                # Calculate center position (compatible with both old and new PIL versions)
+                try:
+                    photo_width = frame_photo.width() if callable(frame_photo.width) else frame_photo.width
+                    photo_height = frame_photo.height() if callable(frame_photo.height) else frame_photo.height
+                except:
+                    # Fallback to reasonable defaults
+                    photo_width = 640
+                    photo_height = 480
+                    
+                x = (canvas_width - photo_width) // 2
+                y = (canvas_height - photo_height) // 2
+                
+                # Clear canvas and draw frame
+                self.video_canvas.delete("all")
+                self.video_canvas.create_image(x, y, anchor='nw', image=frame_photo)
+                
+                # Store reference
+                self._current_frame_photo = frame_photo
+            
+            # Update status displays with throttling
+            self._update_status_displays_throttled(recognized_faces)
+            
+        except Exception as e:
+            self.logger.error(f"Error updating video display: {e}")
+    
+    def _update_status_displays_throttled(self, recognized_faces: list) -> None:
+        """Update status displays with throttling to prevent flickering."""
+        try:
+            # Get current time safely
+            try:
+                current_time = float(time.time())
+            except (TypeError, ValueError):
+                current_time = 0.0
+            
+            # Initialize tracking variables if needed
+            if not hasattr(self, '_last_recognition_update'):
+                self._last_recognition_update = 0.0
+            if not hasattr(self, '_last_frame_time'):
+                self._last_frame_time = current_time
+            
+            # Ensure tracking variables are floats
+            try:
+                self._last_recognition_update = float(self._last_recognition_update)
+                self._last_frame_time = float(self._last_frame_time)
+            except (TypeError, ValueError):
+                self._last_recognition_update = 0.0
+                self._last_frame_time = current_time
+            
+            # Throttle recognition display updates to every 500ms
+            if current_time - self._last_recognition_update < 0.5:
+                # Only update FPS counter
+                if self._last_frame_time is not None:
+                    try:
+                        time_diff = current_time - self._last_frame_time
+                        if time_diff > 0:
+                            fps = 1.0 / time_diff
+                            self.fps_label.config(text=f"FPS: {fps:.1f}")
+                    except (TypeError, ValueError):
+                        pass
+                self._last_frame_time = current_time
+                return
+            
+            self._last_recognition_update = current_time
+            self._last_frame_time = current_time
+            
+            # Update FPS
+            if self._last_frame_time is not None:
+                try:
+                    time_diff = current_time - self._last_frame_time
+                    if time_diff > 0:
+                        fps = 1.0 / time_diff
+                        self.fps_label.config(text=f"FPS: {fps:.1f}")
+                except (TypeError, ValueError):
+                    pass
+            
+            # Use filtered faces for counts but raw faces for display stability
+            display_faces = self._last_filtered_faces if hasattr(self, '_last_filtered_faces') else recognized_faces
+            
+            # Update face count (use raw count for visual consistency)
             face_count = len(recognized_faces)
             self.face_count_label.config(text=f"Faces: {face_count}")
             
-            # Update recognized faces list
-            if recognized_faces:
-                recognized_names = [face['name'] for face in recognized_faces if face['name'] != 'Unknown']
+            # Update recognized faces list with stability
+            if display_faces:
+                recognized_names = [face['name'] for face in display_faces if face['name'] != 'Unknown']
                 if recognized_names:
                     unique_names = list(set(recognized_names))
                     self.recognized_faces_label.config(text=f"Recognized: {', '.join(unique_names[:3])}")
                 else:
                     self.recognized_faces_label.config(text="Recognized: Unknown faces only")
             else:
-                self.recognized_faces_label.config(text="Recognized: None")
+                # Only show "None" if no faces detected recently
+                if face_count == 0:
+                    self.recognized_faces_label.config(text="Recognized: None")
             
             # Update accuracy
             total = self.recognition_stats['total_faces']

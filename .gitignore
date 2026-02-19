@@ -197,3 +197,6 @@ test_*.py
 debug_*.py
 *_test.py
 *_debug.py
+
+#Other
+numberreestr.txt
