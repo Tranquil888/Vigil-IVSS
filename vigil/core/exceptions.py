@@ -48,6 +48,11 @@ class ModelError(VigilException):
     pass
 
 
+class TrainingError(VigilException):
+    """Exception raised for face recognition training errors."""
+    pass
+
+
 class VideoProcessingError(VigilException):
     """Exception raised for video processing errors."""
     pass

@@ -5,10 +5,13 @@ Face detection module for Vigil surveillance system.
 import cv2
 import face_recognition
 import numpy as np
+import os
+import pickle
 from typing import List, Tuple, Optional, Dict, Any
 from vigil.core.exceptions import RecognitionError
 from vigil.utils.logging_config import get_recognition_logger
 from vigil.config.settings import settings
+from vigil.recognition.face_trainer import FaceTrainer
 
 
 class FaceDetector:
@@ -17,36 +20,65 @@ class FaceDetector:
     def __init__(self):
         self.logger = get_recognition_logger()
         self.algorithm = "cnn"  # Default algorithm
+        self.tolerance = 0.6  # Default tolerance
         self.face_encodings = {}
         self.face_names = []
+        self.model_path = ""
         self._load_settings()
         self._load_encodings()
     
     def _load_settings(self) -> None:
         """Load recognition settings from configuration."""
         try:
-            self.algorithm = settings.get_setting('model_algoritm', 'cnn')
-            self.logger.info(f"Face detection algorithm: {self.algorithm}")
+            self.algorithm = settings.get_setting('model_algorithm', 'cnn')
+            self.tolerance = float(settings.get_setting('recognition_tolerance', 0.6))
+            base_path = settings.get_setting('base_path', os.getcwd())
+            self.model_path = settings.get_setting(
+                'model_path',
+                os.path.join(base_path, 'data', 'encodings.pickle')
+            )
+            self.logger.info(f"Face detection algorithm: {self.algorithm}, tolerance: {self.tolerance}")
         except Exception as e:
             self.logger.error(f"Error loading recognition settings: {e}")
             self.algorithm = "cnn"
+            self.tolerance = 0.6
+            self.model_path = os.path.join(os.getcwd(), "data", "encodings.pickle")
     
     def _load_encodings(self) -> None:
         """Load face encodings from pickle file."""
         try:
-            import pickle
-            import os
+            if not self.model_path:
+                self.model_path = os.path.join(os.getcwd(), "data", "encodings.pickle")
             
-            encodings_file = "encodings.pickle"
-            if os.path.exists(encodings_file):
-                with open(encodings_file, "rb") as f:
+            if os.path.exists(self.model_path):
+                with open(self.model_path, "rb") as f:
                     data = pickle.loads(f.read())
-                    self.face_encodings = data.get("encodings", {})
-                    self.face_names = list(self.face_encodings.keys())
+                    
+                    # Handle both old and new format
+                    if "encodings" in data and isinstance(data["encodings"], dict):
+                        # New format: dict of name -> encoding
+                        self.face_encodings = data["encodings"]
+                        self.face_names = list(self.face_encodings.keys())
+                    elif "encodings" in data and "names" in data:
+                        # Old format: lists of encodings and names
+                        encodings_list = data["encodings"]
+                        names_list = data["names"]
+                        self.face_encodings = {}
+                        for encoding, name in zip(encodings_list, names_list):
+                            if name not in self.face_encodings:
+                                self.face_encodings[name] = []
+                            self.face_encodings[name].append(encoding)
+                        self.face_names = list(self.face_encodings.keys())
+                    
+                    # Load additional settings if available
+                    if "algorithm" in data:
+                        self.algorithm = data["algorithm"]
+                    if "tolerance" in data:
+                        self.tolerance = data["tolerance"]
                 
-                self.logger.info(f"Loaded {len(self.face_names)} face encodings")
+                self.logger.info(f"Loaded {len(self.face_names)} face encodings from {self.model_path}")
             else:
-                self.logger.warning("No encodings file found")
+                self.logger.warning(f"No encodings file found at {self.model_path}")
                 
         except Exception as e:
             self.logger.error(f"Error loading face encodings: {e}")
@@ -106,17 +138,20 @@ class FaceDetector:
             self.logger.error(f"Error encoding faces: {e}")
             raise RecognitionError(f"Failed to encode faces: {e}")
     
-    def recognize_faces(self, frame: np.ndarray, tolerance: float = 0.6) -> List[Dict[str, Any]]:
+    def recognize_faces(self, frame: np.ndarray, tolerance: float = None) -> List[Dict[str, Any]]:
         """
         Detect and recognize faces in a frame.
         
         Args:
             frame: Input frame (BGR format)
-            tolerance: Face recognition tolerance
+            tolerance: Face recognition tolerance (uses default if None)
             
         Returns:
             List of recognized face information
         """
+        if tolerance is None:
+            tolerance = self.tolerance
+            
         try:
             # Detect faces
             face_locations = self.detect_faces(frame)
@@ -132,8 +167,30 @@ class FaceDetector:
             
             for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
                 # Compare with known faces
+                # Handle both single encodings and multiple encodings per person
+                all_encodings = []
+                all_names = []
+                
+                for name, encodings in self.face_encodings.items():
+                    if isinstance(encodings, list):
+                        all_encodings.extend(encodings)
+                        all_names.extend([name] * len(encodings))
+                    else:
+                        all_encodings.append(encodings)
+                        all_names.append(name)
+                
+                if not all_encodings:
+                    # No known faces, add as unknown
+                    recognized_faces.append({
+                        'name': "Unknown",
+                        'confidence': 0.0,
+                        'location': (top, right, bottom, left),
+                        'box': (left, top, right - left, bottom - top)
+                    })
+                    continue
+                
                 matches = face_recognition.compare_faces(
-                    list(self.face_encodings.values()),
+                    all_encodings,
                     face_encoding,
                     tolerance=tolerance
                 )
@@ -144,13 +201,13 @@ class FaceDetector:
                 if True in matches:
                     # Find best match
                     face_distances = face_recognition.face_distance(
-                        list(self.face_encodings.values()),
+                        all_encodings,
                         face_encoding
                     )
                     
                     best_match_index = np.argmin(face_distances)
                     if matches[best_match_index]:
-                        name = list(self.face_encodings.keys())[best_match_index]
+                        name = all_names[best_match_index]
                         confidence = 1.0 - face_distances[best_match_index]
                 
                 recognized_faces.append({
@@ -265,21 +322,32 @@ class FaceDetector:
             self.logger.error(f"Error removing face encoding: {e}")
             return False
     
-    def save_encodings(self, filename: str = "encodings.pickle") -> bool:
+    def save_encodings(self, filename: str = None) -> bool:
         """
         Save face encodings to pickle file.
         
         Args:
-            filename: Output filename
+            filename: Output filename (uses default path if None)
             
         Returns:
             True if saved successfully, False otherwise
         """
         try:
-            import pickle
+            if filename is None:
+                filename = self.model_path
+            
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
             
             data = {
-                "encodings": self.face_encodings
+                "encodings": self.face_encodings,
+                "algorithm": self.algorithm,
+                "tolerance": self.tolerance,
+                "training_time": 0,
+                "total_images": 0,
+                "processed_faces": sum(len(encodings) if isinstance(encodings, list) else 1 
+                                      for encodings in self.face_encodings.values()),
+                "unique_faces": len(self.face_names)
             }
             
             with open(filename, "wb") as f:
@@ -303,6 +371,71 @@ class FaceDetector:
     def is_trained(self) -> bool:
         """Check if the face recognition model is trained."""
         return len(self.face_encodings) > 0
+    
+    def get_model_info(self) -> Dict[str, Any]:
+        """
+        Get information about the current model.
+        
+        Returns:
+            Dictionary with model information
+        """
+        return {
+            'is_trained': self.is_trained(),
+            'known_faces_count': len(self.face_names),
+            'known_faces': self.face_names.copy(),
+            'algorithm': self.algorithm,
+            'tolerance': self.tolerance,
+            'model_path': self.model_path,
+            'model_exists': os.path.exists(self.model_path) if self.model_path else False
+        }
+    
+    def set_algorithm(self, algorithm: str) -> bool:
+        """
+        Set the face detection algorithm.
+        
+        Args:
+            algorithm: 'cnn' or 'hog'
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if algorithm not in ["cnn", "hog"]:
+            return False
+        
+        self.algorithm = algorithm
+        self.logger.info(f"Face detection algorithm set to: {algorithm}")
+        return True
+    
+    def set_tolerance(self, tolerance: float) -> bool:
+        """
+        Set the face recognition tolerance.
+        
+        Args:
+            tolerance: Value between 0.0 and 1.0
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if not 0.0 <= tolerance <= 1.0:
+            return False
+        
+        self.tolerance = tolerance
+        self.logger.info(f"Face recognition tolerance set to: {tolerance}")
+        return True
+    
+    def reload_encodings(self) -> bool:
+        """
+        Reload face encodings from the model file.
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            self._load_encodings()
+            return True
+        except Exception as e:
+            self.logger.error(f"Error reloading encodings: {e}")
+            return False
 
 
 # Global face detector instance

@@ -48,7 +48,8 @@ class SettingsManager:
             defaults = [
                 ('model_forone', '0', '0', '0', '0', None, None, None, None, None, None),  # время на одну. объектов. файлов. размер
                 ('numberreestr', '10000', None, None, None, None, None, None, None, None, None),
-                ('model_algoritm', 'cnn', None, None, None, None, None, None, None, None, None),
+                ('model_algorithm', 'cnn', None, None, None, None, None, None, None, None, None),  # Face detection algorithm
+                ('recognition_tolerance', '0.6', None, None, None, None, None, None, None, None, None),  # Face recognition tolerance
                 ('objects_pic', 'circle', None, None, None, None, None, None, None, None, None),
                 ('enabled_sec', '1', None, None, None, None, None, None, None, None, None),
                 ('stream', '127.0.0.1', '8000', None, None, None, None, None, None, None, None),
@@ -59,6 +60,13 @@ class SettingsManager:
                 ('foto_save', '10', None, None, None, None, None, None, None, None, None),  # сохранение кадров для известных
                 ('oper_jurnal', '5', '60', None, None, None, None, None, None, None, None),  # групировка строк в оперативном журнале
                 ('time_format', '1', None, None, None, None, None, None, None, None, None),  # формат времени
+                # Training-related settings
+                ('base_path', os.getcwd(), None, None, None, None, None, None, None, None, None),  # Base application path
+                ('dataset_path', os.path.join(os.getcwd(), 'data', 'dataset'), None, None, None, None, None, None, None, None, None),  # Training dataset path
+                ('model_path', os.path.join(os.getcwd(), 'data', 'encodings.pickle'), None, None, None, None, None, None, None, None, None),  # Model file path
+                ('archive_path', os.path.join(os.getcwd(), 'data', 'data_archives', 'dataset_archives'), None, None, None, None, None, None, None, None, None),  # Archive path
+                ('auto_retrain', '0', None, None, None, None, None, None, None, None, None),  # Auto retrain on dataset changes
+                ('min_images_per_person', '5', None, None, None, None, None, None, None, None, None),  # Minimum images required per person
             ]
             
             for default in defaults:

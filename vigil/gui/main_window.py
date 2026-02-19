@@ -8,11 +8,13 @@ from PIL import Image, ImageTk
 import cv2
 from typing import Optional
 from vigil.gui.dialogs.auth_dialog import AuthenticationDialog
+from vigil.gui.dialogs.training_dialog import TrainingDialog
 from vigil.auth.authorization import authz_manager
 from vigil.utils.logging_config import get_ui_logger
 from vigil.video.capture import video_capture
 from vigil.video.processing import frame_processor
 from vigil.recognition.face_detector import face_detector
+from vigil.recognition.training_service import training_service
 from vigil.events.logger import event_logger
 
 
@@ -356,7 +358,15 @@ class MainWindow:
         if not authz_manager.can_train_model(self.current_role):
             messagebox.showerror("Access Denied", "You don't have permission to train models")
             return
-        messagebox.showinfo("Train Model", "Model training feature coming soon")
+        
+        try:
+            # Show training dialog
+            training_dialog = TrainingDialog(self.root)
+            training_dialog.show()
+            
+        except Exception as e:
+            self.logger.error(f"Error opening training dialog: {e}")
+            messagebox.showerror("Error", f"Failed to open training dialog: {e}")
     
     def _camera_settings(self) -> None:
         if not authz_manager.can_manage_cameras(self.current_role):

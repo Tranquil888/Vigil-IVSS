@@ -7,6 +7,7 @@ from typing import Optional
 from vigil.utils.logging_config import get_main_logger
 from vigil.config.settings import settings
 from vigil.gui.main_window import MainWindow
+from vigil.recognition.training_service import training_service
 
 
 class VigilApp:
@@ -27,6 +28,9 @@ class VigilApp:
         try:
             # Load application settings
             self._load_settings()
+            
+            # Initialize training service
+            self._initialize_training_service()
             
             # Initialize main window
             self._create_main_window()
@@ -50,6 +54,17 @@ class VigilApp:
             
         except Exception as e:
             self.logger.error(f"Error loading settings: {e}")
+    
+    def _initialize_training_service(self) -> None:
+        """Initialize the training service."""
+        try:
+            # Training service is automatically initialized on import
+            # Just verify it's working
+            status = training_service.get_training_status()
+            self.logger.info(f"Training service initialized: {status}")
+            
+        except Exception as e:
+            self.logger.error(f"Error initializing training service: {e}")
     
     def _create_main_window(self) -> None:
         """Create the main application window."""
@@ -99,6 +114,16 @@ class VigilApp:
         """Stop the application."""
         if self.root and self.is_running:
             self.logger.info("Stopping application")
+            
+            # Stop training service if active
+            try:
+                status = training_service.get_training_status()
+                if status.get('is_training'):
+                    training_service.stop_training()
+                    self.logger.info("Stopped training service")
+            except Exception as e:
+                self.logger.error(f"Error stopping training service: {e}")
+            
             self.root.quit()
     
     def on_closing(self) -> None:

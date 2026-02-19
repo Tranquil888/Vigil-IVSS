@@ -84,6 +84,10 @@ def get_video_logger() -> logging.Logger:
     """Get the video processing logger."""
     return vigil_logger.get_logger("vigil.video")
 
+def get_utils_logger() -> logging.Logger:
+    """Get the utilities logger."""
+    return vigil_logger.get_logger("vigil.utils")
+
 
 # Export the main logging function
 def log_exception(logger: logging.Logger, error: Exception, context: str = "") -> None:
