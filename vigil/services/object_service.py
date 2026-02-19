@@ -113,6 +113,11 @@ class ObjectService:
             success, message = self.objects_manager.delete_object(modelfolder)
             
             if success:
+                # Remove dataset folder if requested
+                if remove_dataset:
+                    self.objects_manager._remove_dataset_folder(modelfolder)
+                    message += " (dataset folder removed)"
+                
                 logger.info(f"Deleted object: {obj.get_full_name()}")
                 return True, message
             else:

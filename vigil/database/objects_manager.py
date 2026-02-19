@@ -334,9 +334,28 @@ class ObjectsManager:
         }
         return avatars.get(category, 'no_avatar_grey.jpg')
     
+    def _get_dataset_folder_path(self, modelfolder: str) -> str:
+        """Get dataset folder path, checking both old and new locations for backward compatibility."""
+        from vigil.config.settings import settings
+        
+        # Primary location (correct)
+        new_path = os.path.join(settings.get_setting('dataset_path'), modelfolder)
+        
+        # Fallback location (old, for backward compatibility)
+        old_path = os.path.join(os.path.dirname(self.db_path), '..', 'dataset', modelfolder)
+        
+        # Return the path that exists, or the new path if neither exists
+        if os.path.exists(new_path):
+            return new_path
+        elif os.path.exists(old_path):
+            return old_path
+        else:
+            return new_path
+    
     def _create_dataset_folder(self, modelfolder: str) -> None:
         """Create dataset folder for training."""
-        dataset_path = os.path.join(os.path.dirname(self.db_path), '..', 'dataset', modelfolder)
+        from vigil.config.settings import settings
+        dataset_path = os.path.join(settings.get_setting('dataset_path'), modelfolder)
         try:
             os.makedirs(dataset_path, exist_ok=True)
             logger.info(f"Created dataset folder: {dataset_path}")
@@ -345,7 +364,7 @@ class ObjectsManager:
     
     def _remove_dataset_folder(self, modelfolder: str) -> None:
         """Remove dataset folder (optional)."""
-        dataset_path = os.path.join(os.path.dirname(self.db_path), '..', 'dataset', modelfolder)
+        dataset_path = self._get_dataset_folder_path(modelfolder)
         try:
             if os.path.exists(dataset_path):
                 import shutil
