@@ -453,7 +453,15 @@ class MainWindow:
         res_frame = ttk.Frame(camera_frame)
         res_frame.pack(fill='x', padx=20, pady=5)
         ttk.Label(res_frame, text="Resolution:").pack(side='left')
-        resolution_var = tk.StringVar(value=settings.get_setting('stream_res_qua', '704'))
+        
+        # Get resolution setting properly
+        stream_setting = settings.get_setting('stream_res_qua', '704,90')
+        if ',' in stream_setting:
+            resolution_default = stream_setting.split(',')[0]
+        else:
+            resolution_default = '704'
+        
+        resolution_var = tk.StringVar(value=resolution_default)
         ttk.Entry(res_frame, textvariable=resolution_var, width=10).pack(side='left', padx=10)
         ttk.Label(res_frame, text="pixels").pack(side='left')
         
@@ -461,9 +469,17 @@ class MainWindow:
         quality_frame = ttk.Frame(camera_frame)
         quality_frame.pack(fill='x', padx=20, pady=5)
         ttk.Label(quality_frame, text="Quality:").pack(side='left')
-        quality_var = tk.StringVar(value=settings.get_setting('stream_res_qua', '90').split(',')[1] if ',' in settings.get_setting('stream_res_qua', '90') else '90')
+        
+        # Get quality setting properly
+        stream_setting = settings.get_setting('stream_res_qua', '704,90')
+        if ',' in stream_setting:
+            quality_default = stream_setting.split(',')[1]
+        else:
+            quality_default = '90'
+        
+        quality_var = tk.StringVar(value=quality_default)
         ttk.Entry(quality_frame, textvariable=quality_var, width=10).pack(side='left', padx=10)
-        ttk.Label(quality_frame, text("%").pack(side='left'))
+        ttk.Label(quality_frame, text="%").pack(side='left')
         
         # === Recognition Settings ===
         ttk.Label(recognition_frame, text="Face Recognition Settings", font=("Arial", 12, "bold")).pack(pady=10)
@@ -539,7 +555,11 @@ class MainWindow:
         
         def save_settings():
             try:
-                # Save camera settings
+                # Save camera settings (stream_res_qua needs both resolution and quality)
+                current_setting = settings.get_setting('stream_res_qua', '704,90')
+                new_setting = f"{resolution_var.get()},{quality_var.get()}"
+                
+                # Update both values in the database
                 settings.set_setting('stream_res_qua', resolution_var.get(), quality_var.get())
                 
                 # Save recognition settings

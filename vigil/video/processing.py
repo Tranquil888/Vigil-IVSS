@@ -23,8 +23,12 @@ class FrameProcessor:
         """Load processing settings from configuration."""
         try:
             # Get streaming resolution and quality
-            resolution = settings.get_setting('stream_res_qua', '704')
-            quality = settings.get_setting('stream_res_qua', '90')  # Second value is quality
+            stream_setting = settings.get_setting('stream_res_qua', '704,90')
+            if ',' in stream_setting:
+                resolution, quality = stream_setting.split(',', 1)
+            else:
+                resolution = stream_setting
+                quality = '90'  # Default quality
             
             self.target_resolution = int(resolution)
             self.jpeg_quality = int(quality) if quality else 90

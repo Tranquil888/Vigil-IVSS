@@ -119,11 +119,15 @@ class SettingsManager:
             
             if exists:
                 # Update existing setting
-                placeholders = ','.join([f'set{i+1} = ?' for i in range(len(values))])
+                placeholders = ','.join([f'set{i+1:02d} = ?' for i in range(len(values))])
                 cursor.execute(f'UPDATE setting SET {placeholders} WHERE parametr_name = ?', values + (parameter_name,))
             else:
                 # Insert new setting
-                all_values = (parameter_name,) + values + (None,) * (10 - len(values) - 1)
+                # Database has 11 columns: parametr_name + set01-set10
+                total_columns = 11
+                current_values = (parameter_name,) + values
+                padding_needed = total_columns - len(current_values)
+                all_values = current_values + (None,) * padding_needed
                 placeholders = ','.join(['?'] * len(all_values))
                 cursor.execute(f'INSERT INTO setting VALUES ({placeholders})', all_values)
             
