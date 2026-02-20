@@ -73,6 +73,7 @@ class SettingsManager:
                 ('recognition_frame_skip', '3', None, None, None, None, None, None, None, None, None),  # Process every Nth frame for recognition
                 ('recognition_cooldown', '2', None, None, None, None, None, None, None, None, None),  # Seconds between recognition events for same person
                 ('show_unknown_faces', '1', None, None, None, None, None, None, None, None, None),  # Show unknown face alerts
+                ('camera_max_fps', '30', None, None, None, None, None, None, None, None, None),  # Maximum camera FPS
                 ('recognition_roi_enabled', '0', None, None, None, None, None, None, None, None, None),  # Enable region of interest for recognition
             ]
             

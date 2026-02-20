@@ -578,6 +578,17 @@ class MainWindow:
         ttk.Entry(quality_frame, textvariable=quality_var, width=10).pack(side='left', padx=10)
         ttk.Label(quality_frame, text="%").pack(side='left')
         
+        # FPS
+        fps_frame = ttk.Frame(camera_frame)
+        fps_frame.pack(fill='x', padx=20, pady=5)
+        ttk.Label(fps_frame, text="Max FPS:").pack(side='left')
+        
+        fps_default = settings.get_setting('camera_max_fps', '30')
+        fps_var = tk.StringVar(value=fps_default)
+        fps_combo = ttk.Combobox(fps_frame, textvariable=fps_var, width=10, values=['15', '30', '60', '120'], state='readonly')
+        fps_combo.pack(side='left', padx=10)
+        ttk.Label(fps_frame, text="fps").pack(side='left')
+        
         # === Recognition Settings ===
         ttk.Label(recognition_frame, text="Face Recognition Settings", font=("Arial", 12, "bold")).pack(pady=10)
         
@@ -658,6 +669,9 @@ class MainWindow:
                 
                 # Update both values in the database
                 settings.set_setting('stream_res_qua', resolution_var.get(), quality_var.get())
+                
+                # Save FPS setting
+                settings.set_setting('camera_max_fps', fps_var.get())
                 
                 # Save recognition settings
                 settings.set_setting('face_recognition_enabled', '1' if recognition_enabled_var.get() else '0')
@@ -992,30 +1006,27 @@ class MainWindow:
             
             # Throttle recognition display updates to every 500ms
             if current_time - self._last_recognition_update < 0.5:
-                # Only update FPS counter
-                if self._last_frame_time is not None:
-                    try:
-                        time_diff = current_time - self._last_frame_time
-                        if time_diff > 0:
-                            fps = 1.0 / time_diff
-                            self.fps_label.config(text=f"FPS: {fps:.1f}")
-                    except (TypeError, ValueError):
-                        pass
+                # Update FPS counter using actual capture rate
+                try:
+                    actual_fps = video_capture.get_actual_fps()
+                    if actual_fps > 0:
+                        self.fps_label.config(text=f"FPS: {actual_fps:.1f}")
+                except Exception:
+                    pass
+                    
                 self._last_frame_time = current_time
                 return
             
             self._last_recognition_update = current_time
             self._last_frame_time = current_time
             
-            # Update FPS
-            if self._last_frame_time is not None:
-                try:
-                    time_diff = current_time - self._last_frame_time
-                    if time_diff > 0:
-                        fps = 1.0 / time_diff
-                        self.fps_label.config(text=f"FPS: {fps:.1f}")
-                except (TypeError, ValueError):
-                    pass
+            # Update FPS using actual capture rate
+            try:
+                actual_fps = video_capture.get_actual_fps()
+                if actual_fps > 0:
+                    self.fps_label.config(text=f"FPS: {actual_fps:.1f}")
+            except Exception:
+                pass
             
             # Use filtered faces for counts but raw faces for display stability
             display_faces = self._last_filtered_faces if hasattr(self, '_last_filtered_faces') else recognized_faces

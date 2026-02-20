@@ -26,6 +26,11 @@ class VideoCapture:
         self.height = 0
         self.frame_count = 0
         
+        # FPS tracking for accurate display
+        self.actual_capture_fps = 0
+        self.last_fps_calc_time = 0
+        self.frames_since_last_calc = 0
+        
         # Load camera settings
         self._load_camera_settings()
     
@@ -168,7 +173,18 @@ class VideoCapture:
     def _capture_loop(self) -> None:
         """Main capture loop running in separate thread."""
         last_frame_time = time.time()
-        frame_interval = 1.0 / self.fps if self.fps > 0 else 1.0 / 30.0
+        
+        # Get FPS setting from settings database
+        try:
+            max_fps = int(settings.get_setting('camera_max_fps', '30'))
+        except (ValueError, TypeError):
+            max_fps = 30
+        
+        # Use camera's native FPS if it's lower than max FPS
+        effective_fps = min(max_fps, self.fps) if self.fps > 0 else max_fps
+        frame_interval = 1.0 / effective_fps if effective_fps > 0 else 1.0 / 30.0
+        
+        self.logger.info(f"Using FPS: {effective_fps} (camera: {self.fps}, max: {max_fps})")
         
         while self.is_running and self.cap and self.cap.isOpened():
             try:
@@ -191,7 +207,16 @@ class VideoCapture:
                         self.frame_callback(frame)
                     
                     self.frame_count += 1
+                    self.frames_since_last_calc += 1
                     last_frame_time = current_time
+                    
+                    # Calculate actual FPS every second
+                    if self.last_fps_calc_time == 0:
+                        self.last_fps_calc_time = current_time
+                    elif current_time - self.last_fps_calc_time >= 1.0:
+                        self.actual_capture_fps = self.frames_since_last_calc
+                        self.frames_since_last_calc = 0
+                        self.last_fps_calc_time = current_time
                 
             except Exception as e:
                 self.logger.error(f"Error in capture loop: {e}")
@@ -266,10 +291,15 @@ class VideoCapture:
             'width': self.width,
             'height': self.height,
             'fps': self.fps,
+            'actual_fps': self.actual_capture_fps,  # Real capture rate
             'frame_count': self.get_frame_count(),
             'is_running': self.is_running,
             'frames_captured': self.frame_count
         }
+    
+    def get_actual_fps(self) -> float:
+        """Get the actual capture FPS (not camera's reported FPS)."""
+        return self.actual_capture_fps
 
 
 # Global video capture instance
