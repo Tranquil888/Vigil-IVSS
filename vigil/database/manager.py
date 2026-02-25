@@ -305,7 +305,9 @@ class CameraDatabase(DatabaseManager):
             CREATE TABLE IF NOT EXISTS cameras (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 activ_number TEXT UNIQUE NOT NULL,
+                name TEXT,
                 link TEXT,
+                source_type TEXT DEFAULT 'camera',
                 cam_set_a TEXT,
                 cam_set_b TEXT,
                 cam_set_c TEXT,
@@ -315,13 +317,50 @@ class CameraDatabase(DatabaseManager):
             )
         '''
         self.execute_update(cameras_query)
+        self._migrate_database()
     
-    def create_camera(self, activ_number: str, link: str = None, **settings) -> int:
+    def _migrate_database(self) -> None:
+        """Migrate existing database to new schema."""
+        try:
+            # Check if name column exists
+            result = self.execute_query("PRAGMA table_info(cameras)")
+            columns = [row['name'] for row in result]
+            
+            if 'name' not in columns:
+                self.execute_update("ALTER TABLE cameras ADD COLUMN name TEXT")
+                self.logger.info("Added name column to cameras table")
+            
+            if 'source_type' not in columns:
+                self.execute_update("ALTER TABLE cameras ADD COLUMN source_type TEXT DEFAULT 'camera'")
+                self.logger.info("Added source_type column to cameras table")
+                
+        except Exception as e:
+            self.logger.warning(f"Database migration failed (may already be migrated): {e}")
+    
+    def create_camera(self, activ_number: str, link: str = None, source_type: str = 'camera', name: str = None, **settings) -> int:
         """Create a new camera record."""
-        fields = ['activ_number', 'link'] + list(settings.keys())
-        placeholders = ','.join(['?'] * len(fields))
-        values = [activ_number, link] + list(settings.values())
+        # Build fields and values dynamically
+        fields = ['activ_number']
+        values = [activ_number]
         
+        if name is not None:
+            fields.append('name')
+            values.append(name)
+        
+        if link is not None:
+            fields.append('link')
+            values.append(link)
+            
+        fields.append('source_type')
+        values.append(source_type)
+        
+        # Add any additional settings
+        for key, value in settings.items():
+            if key.startswith('cam_set_'):
+                fields.append(key)
+                values.append(value)
+        
+        placeholders = ','.join(['?'] * len(fields))
         query = f'INSERT INTO cameras ({",".join(fields)}) VALUES ({placeholders})'
         self.execute_update(query, tuple(values))
         

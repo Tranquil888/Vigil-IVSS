@@ -7,6 +7,7 @@ from tkinter import ttk, messagebox
 from PIL import Image, ImageTk
 import cv2
 import time
+import os
 from time import strftime
 from typing import Optional
 from vigil.gui.dialogs.auth_dialog import AuthenticationDialog
@@ -539,12 +540,109 @@ class MainWindow:
         # === Camera Settings ===
         ttk.Label(camera_frame, text="Camera Settings", font=("Arial", 12, "bold")).pack(pady=10)
         
-        # Camera source
-        source_frame = ttk.Frame(camera_frame)
-        source_frame.pack(fill='x', padx=20, pady=5)
-        ttk.Label(source_frame, text="Camera Source:").pack(side='left')
-        camera_source_var = tk.StringVar(value=str(video_capture.camera_link or "0"))
-        ttk.Entry(source_frame, textvariable=camera_source_var, width=20).pack(side='left', padx=10)
+        # Load existing camera settings from database
+        from vigil.database.manager import get_camera_db
+        camera_db = get_camera_db()
+        existing_camera = camera_db.get_camera('channel_01')
+        
+        # Determine source type and path from database
+        if existing_camera:
+            source_type = existing_camera.get('source_type', 'camera')
+            camera_link = existing_camera.get('link', '0')
+            camera_name = existing_camera.get('name', '')
+        else:
+            source_type = 'camera'
+            camera_link = str(video_capture.camera_link or "0")
+            camera_name = ''
+        
+        # Source type selection
+        source_type_frame = ttk.Frame(camera_frame)
+        source_type_frame.pack(fill='x', padx=20, pady=5)
+        ttk.Label(source_type_frame, text="Source Type:").pack(side='left')
+        
+        source_type_var = tk.StringVar(value=source_type)
+        camera_radio = ttk.Radiobutton(source_type_frame, text="Camera", variable=source_type_var, value='camera', 
+                                      command=lambda: self._update_source_ui(source_type_var.get(), camera_link_frame, video_file_frame))
+        camera_radio.pack(side='left', padx=10)
+        
+        file_radio = ttk.Radiobutton(source_type_frame, text="Video File", variable=source_type_var, value='file',
+                                    command=lambda: self._update_source_ui(source_type_var.get(), camera_link_frame, video_file_frame))
+        file_radio.pack(side='left', padx=10)
+        
+        # Camera source frame
+        camera_link_frame = ttk.LabelFrame(camera_frame, text="Camera Settings")
+        camera_link_frame.pack(fill='x', padx=20, pady=10)
+        
+        camera_source_frame = ttk.Frame(camera_link_frame)
+        camera_source_frame.pack(fill='x', padx=10, pady=5)
+        ttk.Label(camera_source_frame, text="Camera Link:").pack(side='left')
+        camera_source_var = tk.StringVar(value=camera_link if source_type == 'camera' else '0')
+        camera_source_entry = ttk.Entry(camera_source_frame, textvariable=camera_source_var, width=30)
+        camera_source_entry.pack(side='left', padx=10, fill='x', expand=True)
+        
+        # Video file frame
+        video_file_frame = ttk.LabelFrame(camera_frame, text="Video File Settings")
+        video_file_frame.pack(fill='x', padx=20, pady=10)
+        
+        video_file_path_frame = ttk.Frame(video_file_frame)
+        video_file_path_frame.pack(fill='x', padx=10, pady=5)
+        ttk.Label(video_file_path_frame, text="Video File:").pack(side='left')
+        video_file_var = tk.StringVar(value=camera_link if source_type == 'file' else '')
+        video_file_entry = ttk.Entry(video_file_path_frame, textvariable=video_file_var, width=25)
+        video_file_entry.pack(side='left', padx=10, fill='x', expand=True)
+        
+        def browse_video_file():
+            from tkinter import filedialog
+            file_path = filedialog.askopenfilename(
+                title="Select Video File",
+                filetypes=[
+                    ("Video Files", "*.mp4 *.avi *.mov *.mkv *.wmv *.flv"),
+                    ("MP4 Files", "*.mp4"),
+                    ("AVI Files", "*.avi"),
+                    ("MOV Files", "*.mov"),
+                    ("MKV Files", "*.mkv"),
+                    ("All Files", "*.*")
+                ]
+            )
+            if file_path:
+                video_file_var.set(file_path)
+        
+        ttk.Button(video_file_path_frame, text="Browse", command=browse_video_file).pack(side='right', padx=5)
+        
+        # Video playback options
+        playback_frame = ttk.Frame(video_file_frame)
+        playback_frame.pack(fill='x', padx=10, pady=5)
+        
+        loop_var = tk.BooleanVar(value=settings.get_setting('video_loop_playback', '0') == '1')
+        ttk.Checkbutton(playback_frame, text="Loop Playback", variable=loop_var).pack(side='left', padx=5)
+        
+        show_progress_var = tk.BooleanVar(value=settings.get_setting('video_progress_show', '1') == '1')
+        ttk.Checkbutton(playback_frame, text="Show Progress", variable=show_progress_var).pack(side='left', padx=5)
+        
+        # Video speed control
+        speed_frame = ttk.Frame(video_file_frame)
+        speed_frame.pack(fill='x', padx=10, pady=5)
+        ttk.Label(speed_frame, text="Playback Speed:").pack(side='left')
+        
+        speed_var = tk.StringVar(value=settings.get_setting('video_playback_speed', '1.0'))
+        speed_combo = ttk.Combobox(speed_frame, textvariable=speed_var, width=10, state='readonly')
+        speed_combo['values'] = ('0.25', '0.5', '0.75', '1.0', '1.25', '1.5', '2.0')
+        speed_combo.pack(side='left', padx=10)
+        # Don't override the loaded setting - let it use the value from settings.get_setting()
+        
+        # Initially hide/show frames based on source type
+        if source_type == 'file':
+            camera_link_frame.pack_forget()
+        else:
+            video_file_frame.pack_forget()
+        
+        # Store reference for UI updates
+        settings_window.camera_source_var = camera_source_var
+        settings_window.video_file_var = video_file_var
+        settings_window.source_type_var = source_type_var
+        settings_window.loop_var = loop_var
+        settings_window.show_progress_var = show_progress_var
+        settings_window.speed_var = speed_var
         
         # Resolution
         res_frame = ttk.Frame(camera_frame)
@@ -663,6 +761,68 @@ class MainWindow:
         
         def save_settings():
             try:
+                # Get source type and corresponding settings
+                source_type = source_type_var.get()
+                
+                if source_type == 'camera':
+                    # Save camera settings to camera database
+                    camera_link = camera_source_var.get()
+                    camera_name = f"Camera {camera_link}"
+                    
+                    # Update or create camera record
+                    from vigil.database.manager import get_camera_db
+                    camera_db = get_camera_db()
+                    
+                    # Check if camera already exists
+                    existing_camera = camera_db.get_camera('channel_01')
+                    if existing_camera:
+                        camera_db.update_camera('channel_01', 
+                                              link=camera_link, 
+                                              source_type='camera',
+                                              name=camera_name)
+                    else:
+                        camera_db.create_camera('channel_01', 
+                                              link=camera_link, 
+                                              source_type='camera',
+                                              name=camera_name)
+                    
+                    # Update video_capture camera_link reference
+                    video_capture.camera_link = camera_link
+                    
+                else:  # file
+                    # Save video file settings to camera database
+                    video_file = video_file_var.get()
+                    if not video_file:
+                        messagebox.showerror("Error", "Please select a video file")
+                        return
+                    
+                    video_name = os.path.basename(video_file)
+                    
+                    # Update or create camera record for video file
+                    from vigil.database.manager import get_camera_db
+                    camera_db = get_camera_db()
+                    
+                    # Check if video source already exists
+                    existing_camera = camera_db.get_camera('channel_01')
+                    if existing_camera:
+                        camera_db.update_camera('channel_01', 
+                                              link=video_file, 
+                                              source_type='file',
+                                              name=video_name)
+                    else:
+                        camera_db.create_camera('channel_01', 
+                                              link=video_file, 
+                                              source_type='file',
+                                              name=video_name)
+                    
+                    # Update video_capture camera_link reference
+                    video_capture.camera_link = video_file
+                
+                # Save video playback settings
+                settings.set_setting('video_loop_playback', '1' if loop_var.get() else '0')
+                settings.set_setting('video_progress_show', '1' if show_progress_var.get() else '0')
+                settings.set_setting('video_playback_speed', speed_var.get())
+                
                 # Save camera settings (stream_res_qua needs both resolution and quality)
                 current_setting = settings.get_setting('stream_res_qua', '704,90')
                 new_setting = f"{resolution_var.get()},{quality_var.get()}"
@@ -703,6 +863,15 @@ class MainWindow:
         x = (settings_window.winfo_screenwidth() // 2) - (settings_window.winfo_width() // 2)
         y = (settings_window.winfo_screenheight() // 2) - (settings_window.winfo_height() // 2)
         settings_window.geometry(f"+{x}+{y}")
+    
+    def _update_source_ui(self, source_type: str, camera_frame: ttk.Widget, video_frame: ttk.Widget) -> None:
+        """Update UI based on source type selection."""
+        if source_type == 'camera':
+            camera_frame.pack(fill='x', padx=20, pady=10, after=video_frame)
+            video_frame.pack_forget()
+        else:  # file
+            video_frame.pack(fill='x', padx=20, pady=10, after=camera_frame)
+            camera_frame.pack_forget()
     
     def _start_recording(self) -> None:
         if not authz_manager.can_record_video(self.current_role):
@@ -756,6 +925,10 @@ class MainWindow:
             # Get camera source from settings
             camera_source = video_capture.camera_link or 0  # Default to webcam if no camera configured
             
+            # Check if source is a video file
+            is_video_file = (isinstance(camera_source, str) and 
+                           camera_source.lower().endswith(('.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv')))
+            
             # Open video source
             if video_capture.open_source(camera_source):
                 # Start frame capture
@@ -770,11 +943,22 @@ class MainWindow:
                 self._last_recognition_update = 0  # Throttle recognition display updates
                 self._last_frame_time = float(time.time())  # Initialize FPS tracking with actual time value
                 
+                # Video progress tracking
+                self.progress_update_timer = None
+                self.video_progress_bar = None
+                
                 # Load recognition settings
                 self.recognition_enabled = settings.get_setting('face_recognition_enabled', '1') == '1'
                 self.recognition_enabled_var.set(self.recognition_enabled)
                 
-                self.status_label.config(text="Camera started")
+                # Set appropriate status message
+                if is_video_file:
+                    video_name = os.path.basename(camera_source)
+                    self.status_label.config(text=f"Playing video: {video_name}")
+                    source_desc = f"Video file: {video_name}"
+                else:
+                    self.status_label.config(text="Camera started")
+                    source_desc = f"Camera: {camera_source}"
                 
                 if self.recognition_enabled and face_detector.is_trained():
                     self.recognition_label.config(text="Recognition: Active")
@@ -787,20 +971,27 @@ class MainWindow:
                 self.start_camera_btn.config(state='disabled')
                 self.stop_camera_btn.config(state='normal')
                 
-                # Log system event
-                event_logger.log_system_event('camera_started', f'Camera started: {camera_source}')
+                # Start video progress updates if it's a video file and progress display is enabled
+                if is_video_file and settings.get_setting('video_progress_show', '1') == '1':
+                    self._start_video_progress_updates()
                 
-                self.logger.info(f"Camera started with source: {camera_source}")
+                # Log system event
+                event_logger.log_system_event('camera_started', f'Video source started: {source_desc}')
+                
+                self.logger.info(f"Video source started: {source_desc}")
             else:
-                messagebox.showerror("Error", "Failed to start camera")
+                messagebox.showerror("Error", "Failed to start video source")
                 
         except Exception as e:
-            self.logger.error(f"Error starting camera: {e}")
-            messagebox.showerror("Error", f"Failed to start camera: {e}")
+            self.logger.error(f"Error starting video source: {e}")
+            messagebox.showerror("Error", f"Failed to start video source: {e}")
     
     def _stop_camera(self) -> None:
         """Stop camera capture."""
         try:
+            # Stop video progress updates
+            self._stop_video_progress_updates()
+            
             video_capture.stop_capture()
             video_capture.close_source()
             
@@ -830,6 +1021,95 @@ class MainWindow:
             
         except Exception as e:
             self.logger.error(f"Error stopping camera: {e}")
+    
+    def _start_video_progress_updates(self) -> None:
+        """Start video progress bar updates."""
+        if not video_capture.is_video_file_source():
+            return
+        
+        # Create progress bar in camera controls area if it doesn't exist
+        if not self.video_progress_bar:
+            progress_frame = ttk.Frame(self.camera_frame)
+            progress_frame.pack(fill='x', padx=5, pady=2, before=self.camera_frame.winfo_children()[1])
+            
+            ttk.Label(progress_frame, text="Progress:").pack(side='left', padx=5)
+            self.video_progress_bar = ttk.Progressbar(progress_frame, mode='determinate')
+            self.video_progress_bar.pack(side='left', fill='x', expand=True, padx=5)
+            
+            self.progress_label = ttk.Label(progress_frame, text="0:00 / 0:00")
+            self.progress_label.pack(side='right', padx=5)
+        
+        # Start progress updates
+        self._update_video_progress()
+    
+    def _update_video_progress(self) -> None:
+        """Update video progress display."""
+        if not self.is_camera_running or not video_capture.is_video_file_source():
+            return
+        
+        progress_info = video_capture.get_video_progress()
+        
+        if progress_info['is_video_file']:
+            # Update progress bar
+            self.video_progress_bar['value'] = progress_info['progress_percent']
+            
+            # Format time display
+            current_time = self._format_time(progress_info['current_frame'], video_capture.get_fps())
+            total_time = self._format_time(progress_info['total_frames'], video_capture.get_fps())
+            self.progress_label.config(text=f"{current_time} / {total_time}")
+            
+            # Check if video is complete
+            if progress_info['progress_percent'] >= 99.9:
+                self._on_video_complete()
+                return
+        
+        # Schedule next update
+        self.progress_update_timer = self.root.after(500, self._update_video_progress)
+    
+    def _format_time(self, frames: int, fps: float) -> str:
+        """Format frame count as MM:SS time string."""
+        if fps <= 0:
+            return "0:00"
+        
+        seconds = int(frames / fps)
+        minutes = seconds // 60
+        seconds = seconds % 60
+        return f"{minutes}:{seconds:02d}"
+    
+    def _on_video_complete(self) -> None:
+        """Handle video completion."""
+        if not video_capture.is_video_file_source():
+            return
+        
+        # Check if loop playback is enabled
+        if settings.get_setting('video_loop_playback', '0') == '1':
+            self.logger.info("Video completed, looping...")
+            # Video will automatically loop in VideoCapture class
+        else:
+            self.logger.info("Video completed")
+            self.status_label.config(text="Video completed")
+            
+            # Show completion dialog
+            if messagebox.askyesno("Video Complete", "Video has finished playing. Would you like to replay?"):
+                # Restart video
+                if video_capture.is_video_file_source():
+                    video_capture.seek_to_frame(0)
+                    self.status_label.config(text="Replaying video...")
+            else:
+                # Stop camera
+                self._stop_camera()
+    
+    def _stop_video_progress_updates(self) -> None:
+        """Stop video progress updates."""
+        if self.progress_update_timer:
+            self.root.after_cancel(self.progress_update_timer)
+            self.progress_update_timer = None
+        
+        # Hide progress bar
+        if self.video_progress_bar:
+            progress_frame = self.video_progress_bar.master
+            progress_frame.pack_forget()
+            self.video_progress_bar = None
     
     def _toggle_recognition(self) -> None:
         """Toggle face recognition on/off."""

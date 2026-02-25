@@ -75,6 +75,10 @@ class SettingsManager:
                 ('show_unknown_faces', '1', None, None, None, None, None, None, None, None, None),  # Show unknown face alerts
                 ('camera_max_fps', '30', None, None, None, None, None, None, None, None, None),  # Maximum camera FPS
                 ('recognition_roi_enabled', '0', None, None, None, None, None, None, None, None, None),  # Enable region of interest for recognition
+                # Video analysis settings
+                ('video_loop_playback', '0', None, None, None, None, None, None, None, None, None),  # Loop video playback
+                ('video_progress_show', '1', None, None, None, None, None, None, None, None, None),  # Show video progress bar
+                ('video_playback_speed', '1.0', None, None, None, None, None, None, None, None, None),  # Video playback speed multiplier
             ]
             
             for default in defaults:
