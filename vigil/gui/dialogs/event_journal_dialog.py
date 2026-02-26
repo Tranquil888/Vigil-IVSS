@@ -207,17 +207,17 @@ class EventJournalDialog:
         photos_frame.columnconfigure(0, weight=1)
         photos_frame.rowconfigure(0, weight=1)
         
-        # Photos canvas with scrollbar
+        # Photos canvas with VERTICAL scrollbar for grid layout
         self.photos_canvas = tk.Canvas(photos_frame, bg='white')
-        photos_scrollbar = ttk.Scrollbar(photos_frame, orient=tk.HORIZONTAL, command=self.photos_canvas.xview)
-        self.photos_canvas.configure(xscrollcommand=photos_scrollbar.set)
+        photos_scrollbar = ttk.Scrollbar(photos_frame, orient=tk.VERTICAL, command=self.photos_canvas.yview)
+        self.photos_canvas.configure(yscrollcommand=photos_scrollbar.set)
         
         self.photos_frame_inner = ttk.Frame(self.photos_canvas)
         self.photos_canvas.create_window((0, 0), window=self.photos_frame_inner, anchor='nw')
         
         # Grid widgets
         self.photos_canvas.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        photos_scrollbar.grid(row=1, column=0, sticky=(tk.W, tk.E))
+        photos_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
         
         # Bind canvas events
         self.photos_frame_inner.bind('<Configure>', self._on_photos_frame_configure)
@@ -372,42 +372,85 @@ class EventJournalDialog:
             self.logger.error(f"Error loading event photos: {e}")
     
     def _create_photo_thumbnail(self, photo_path: str, photo_data: Dict, index: int) -> None:
-        """Create a photo thumbnail."""
+        """Create a photo thumbnail in a responsive grid layout."""
         try:
             # Load and resize image
             image = Image.open(photo_path)
-            image.thumbnail((100, 100), Image.Resampling.LANCZOS)
+            image.thumbnail((120, 120), Image.Resampling.LANCZOS)
             photo = ImageTk.PhotoImage(image)
             
             # Store reference to prevent garbage collection
             self.photo_thumbnails.append(photo)
             
+            # Calculate grid position dynamically based on current window width
+            cols = self._calculate_photo_columns()
+            row = index // cols
+            col = index % cols
+            
             # Create frame for photo
             photo_frame = ttk.Frame(self.photos_frame_inner, relief=tk.RAISED, borderwidth=1)
-            photo_frame.grid(row=0, column=index, padx=5, pady=5)
+            photo_frame.grid(row=row, column=col, padx=5, pady=5, sticky=(tk.W, tk.E, tk.N, tk.S))
             
             # Photo label
             photo_label = ttk.Label(photo_frame, image=photo)
-            photo_label.pack()
+            photo_label.pack(pady=(5, 2))
             
             # Info label
             info_text = f"{photo_data['object_name']}\n{photo_data['timestamp']}"
-            info_label = ttk.Label(photo_frame, text=info_text, font=('Arial', 8))
-            info_label.pack()
+            info_label = ttk.Label(photo_frame, text=info_text, font=('Arial', 8), wraplength=110)
+            info_label.pack(pady=(0, 5))
             
         except Exception as e:
             self.logger.error(f"Error creating photo thumbnail: {e}")
     
+    def _calculate_photo_columns(self) -> int:
+        """Calculate optimal number of photo columns based on canvas width."""
+        try:
+            # Get current canvas width
+            canvas_width = self.photos_canvas.winfo_width()
+            
+            # Minimum width per photo (including padding)
+            min_photo_width = 140  # 120px image + 20px padding
+            
+            # Calculate columns, ensuring at least 2 and max 8
+            if canvas_width > 1:  # Valid width
+                cols = max(2, min(8, canvas_width // min_photo_width))
+            else:
+                cols = 4  # Default fallback
+            
+            return cols
+        except:
+            return 4  # Default fallback
+    
     def _on_photos_frame_configure(self, event) -> None:
         """Handle photos frame configure event."""
-        # Update scroll region
+        # Update scroll region to encompass all photos
         self.photos_canvas.configure(scrollregion=self.photos_canvas.bbox('all'))
+        
+        # Configure grid columns dynamically
+        cols = self._calculate_photo_columns()
+        for i in range(cols):  # Dynamic number of columns
+            self.photos_frame_inner.columnconfigure(i, weight=1, minsize=130)
     
     def _on_photos_canvas_configure(self, event) -> None:
-        """Handle photos canvas configure event."""
+        """Handle photos canvas configure event - refresh layout on resize."""
         # Update canvas width
         canvas_width = event.width
         self.photos_canvas.itemconfig(self.photos_canvas.find_all()[0], width=canvas_width)
+        
+        # Refresh photo layout to adapt to new width
+        self._refresh_photo_layout()
+    
+    def _refresh_photo_layout(self) -> None:
+        """Refresh photo layout to adapt to new window size."""
+        try:
+            # Get current selected event
+            selected_items = self.events_tree.selection()
+            if selected_items:
+                event_id = self.events_tree.item(selected_items[0])['values'][0]
+                self._load_event_photos(event_id)
+        except Exception as e:
+            self.logger.error(f"Error refreshing photo layout: {e}")
     
     def _apply_filter(self) -> None:
         """Apply date filter to events."""
