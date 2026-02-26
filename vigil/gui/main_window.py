@@ -1150,19 +1150,31 @@ class MainWindow:
                 
                 self.last_recognition_frame = self.frame_count
                 
-                # Recognize faces with confidence threshold
-                # Use tolerance directly from settings, not inverted confidence
+                # Recognize faces with improved confidence threshold
+                # Use more strict tolerance for better accuracy
                 tolerance = float(confidence_threshold) if confidence_threshold > 0.5 else 0.6
                 raw_recognized_faces = face_detector.recognize_faces(frame, tolerance=tolerance)
                 
-                # Filter faces based on confidence and cooldown
+                # Filter faces based on confidence and cooldown with improved accuracy
                 filtered_faces = []
                 for face in raw_recognized_faces:
                     face_name = face['name']
                     confidence = face['confidence']
                     
-                    # Check cooldown period for recognized faces
+                    # Additional confidence check - require higher confidence for known faces
                     if face_name != 'Unknown':
+                        # Require higher confidence for known faces to reduce false positives
+                        if confidence < 0.45:  # Minimum 45% confidence for known faces
+                            # Treat as unknown if confidence is too low
+                            face['name'] = 'Unknown'
+                            filtered_faces.append(face)
+                            event_logger.log_unknown_face(
+                                confidence,
+                                camera_source=str(video_capture.current_source)
+                            )
+                            continue
+                        
+                        # Check cooldown period for recognized faces
                         try:
                             last_time = float(self.last_recognition_time.get(face_name, 0))
                             if float(time.time()) - last_time >= cooldown_period:
@@ -1176,10 +1188,10 @@ class MainWindow:
                                     camera_source=str(video_capture.current_source)
                                 )
                         except (TypeError, ValueError):
-                            # If time operations fail, just add the face without cooldown
+                            # If time operations fail, just add face without cooldown
                             filtered_faces.append(face)
                     else:
-                        # Always log unknown faces (or implement separate cooldown)
+                        # For unknown faces, still log them
                         filtered_faces.append(face)
                         event_logger.log_unknown_face(
                             confidence,

@@ -205,18 +205,35 @@ class VideoCapture:
         loop_playback = settings.get_setting('video_loop_playback', '0') == '1'
         video_speed_multiplier = float(settings.get_setting('video_playback_speed', '1.0'))
         
-        # For video files, calculate frame skipping to reduce CPU load
+        # For video files, calculate frame skipping to reduce CPU load based on resolution and FPS
         if self.is_video_file:
             native_fps = self.fps if self.fps > 0 else 30.0
-            # Skip frames for high FPS videos to reduce CPU load
-            if native_fps > 30:
-                self.frame_skip = 2  # Process every 2nd frame
-            elif native_fps > 20:
-                self.frame_skip = 1  # Process every frame
-            else:
-                self.frame_skip = 0  # Process every frame for low FPS
+            # Calculate resolution-based frame skipping
+            total_pixels = self.width * self.height
+            
+            # Adaptive frame skipping based on resolution and FPS
+            if total_pixels > 1280 * 720:  # HD and above
+                if native_fps > 30:
+                    self.frame_skip = 3  # Process every 4th frame
+                elif native_fps > 20:
+                    self.frame_skip = 2  # Process every 3rd frame
+                else:
+                    self.frame_skip = 1  # Process every 2nd frame
+            elif total_pixels > 640 * 480:  # SD to HD
+                if native_fps > 30:
+                    self.frame_skip = 2  # Process every 3rd frame
+                elif native_fps > 20:
+                    self.frame_skip = 1  # Process every 2nd frame
+                else:
+                    self.frame_skip = 0  # Process every frame
+            else:  # Low resolution
+                if native_fps > 30:
+                    self.frame_skip = 1  # Process every 2nd frame
+                else:
+                    self.frame_skip = 0  # Process every frame
+                    
             self.frame_counter = 0
-            self.logger.info(f"Video frame skipping: Native FPS={native_fps}, Skip every {self.frame_skip + 1} frames")
+            self.logger.info(f"Video frame skipping: Resolution={self.width}x{self.height}, Native FPS={native_fps}, Skip every {self.frame_skip + 1} frames")
             
             # Apply speed multiplier using OpenCV's playback speed property
             # This is the correct way to control video playback speed
