@@ -26,8 +26,13 @@ class EventJournalDialog:
         self.dialog = tk.Toplevel(root)
         self.dialog.title("Event Journal")
         self.dialog.geometry("1200x700")
-        self.dialog.transient(root)
-        self.dialog.grab_set()
+        
+        # Make window resizable and enable maximize button
+        self.dialog.resizable(True, True)
+        self.dialog.attributes('-toolwindow', False)  # Enable maximize button
+        
+        # Min size to prevent UI issues
+        self.dialog.minsize(800, 600)
         
         # State
         self.selected_event_id = None
@@ -44,14 +49,15 @@ class EventJournalDialog:
     def _create_widgets(self) -> None:
         """Create dialog widgets."""
         # Main container
-        main_frame = ttk.Frame(self.dialog, padding="10")
-        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        main_frame = ttk.Frame(self.dialog, padding="5")
+        main_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # Configure grid weights
         self.dialog.columnconfigure(0, weight=1)
-        self.dialog.rowconfigure(0, weight=1)
+        self.dialog.rowconfigure(1, weight=1)
         main_frame.columnconfigure(0, weight=1)
         main_frame.rowconfigure(1, weight=1)
+        main_frame.rowconfigure(2, weight=0)  # Button controls row
         
         # Filter controls
         self._create_filter_controls(main_frame)
@@ -78,28 +84,32 @@ class EventJournalDialog:
         filter_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
         filter_frame.columnconfigure(1, weight=1)
         
-        # Date range
-        ttk.Label(filter_frame, text="From:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        # First row - All controls including Event Delay
+        controls_frame = ttk.Frame(filter_frame)
+        controls_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 5))
+        
+        # Date filters
+        ttk.Label(controls_frame, text="From:").pack(side=tk.LEFT, padx=(0, 5))
         self.start_date_var = tk.StringVar()
-        self.start_date_entry = ttk.Entry(filter_frame, textvariable=self.start_date_var, width=12)
-        self.start_date_entry.grid(row=0, column=1, sticky=tk.W, padx=(0, 10))
+        self.start_date_entry = ttk.Entry(controls_frame, textvariable=self.start_date_var, width=12)
+        self.start_date_entry.pack(side=tk.LEFT, padx=(0, 10))
         
-        ttk.Label(filter_frame, text="To:").grid(row=0, column=2, sticky=tk.W, padx=(0, 5))
+        ttk.Label(controls_frame, text="To:").pack(side=tk.LEFT, padx=(0, 5))
         self.end_date_var = tk.StringVar()
-        self.end_date_entry = ttk.Entry(filter_frame, textvariable=self.end_date_var, width=12)
-        self.end_date_entry.grid(row=0, column=3, sticky=tk.W, padx=(0, 10))
+        self.end_date_entry = ttk.Entry(controls_frame, textvariable=self.end_date_var, width=12)
+        self.end_date_entry.pack(side=tk.LEFT, padx=(0, 10))
         
-        # Filter button
-        ttk.Button(filter_frame, text="Filter", command=self._apply_filter).grid(row=0, column=4, padx=(0, 5))
-        ttk.Button(filter_frame, text="Clear", command=self._clear_filter).grid(row=0, column=5, padx=(0, 10))
+        # Filter buttons
+        ttk.Button(controls_frame, text="Filter", command=self._apply_filter).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(controls_frame, text="Clear", command=self._clear_filter).pack(side=tk.LEFT, padx=(0, 10))
         
-        # Event delay setting (admin only)
-        if self.main_window and authz_manager.has_permission(self.main_window.current_role, 'admin'):
-            ttk.Label(filter_frame, text="Event Delay (s):").grid(row=0, column=6, sticky=tk.W, padx=(10, 5))
+        # Event delay setting (admin only) - moved to first row
+        if self.main_window and authz_manager.has_permission(self.main_window.current_role, 'admin_access'):
+            ttk.Label(controls_frame, text="Event Delay (s):", font=('Arial', 10, 'bold')).pack(side=tk.LEFT, padx=(10, 5))
             self.delay_var = tk.StringVar(value="10")
-            delay_entry = ttk.Entry(filter_frame, textvariable=self.delay_var, width=5)
-            delay_entry.grid(row=0, column=7, sticky=tk.W, padx=(0, 5))
-            ttk.Button(filter_frame, text="Update", command=self._update_delay).grid(row=0, column=8)
+            delay_entry = ttk.Entry(controls_frame, textvariable=self.delay_var, width=5)
+            delay_entry.pack(side=tk.LEFT, padx=(0, 5))
+            ttk.Button(controls_frame, text="Update", command=self._update_delay).pack(side=tk.LEFT)
     
     def _create_events_table(self, parent) -> None:
         """Create events table."""
