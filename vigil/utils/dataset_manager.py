@@ -6,7 +6,9 @@ Handles dataset operations, validation, and statistics.
 import os
 import shutil
 import time
-from typing import Dict, List, Any, Optional
+import cv2
+import numpy as np
+from typing import Dict, List, Any, Optional, Tuple
 from PIL import Image
 from vigil.utils.logging_config import get_utils_logger
 
@@ -349,6 +351,177 @@ class DatasetManager:
             
         except Exception as e:
             self.logger.error(f"Error cleaning up empty directories: {e}")
+            return 0
+    
+    def capture_face(self, frame: np.ndarray, face_location: Tuple[int, int, int, int], 
+                   object_name: str) -> Optional[str]:
+        """
+        Capture and save a face frame from video stream.
+        
+        Args:
+            frame: Video frame containing the face
+            face_location: Tuple of (top, right, bottom, left) face coordinates
+            object_name: Name of the recognized object
+            
+        Returns:
+            Path to saved face image, or None if failed
+        """
+        try:
+            # Extract face coordinates
+            top, right, bottom, left = face_location
+            
+            # Add padding around the face
+            padding = 20
+            top = max(0, top - padding)
+            left = max(0, left - padding)
+            bottom = min(frame.shape[0], bottom + padding)
+            right = min(frame.shape[1], right + padding)
+            
+            # Extract face ROI
+            face_roi = frame[top:bottom, left:right]
+            
+            if face_roi.size == 0:
+                self.logger.warning("Empty face ROI detected")
+                return None
+            
+            # Create captured faces directory structure
+            base_dir = os.path.join(os.getcwd(), 'data', 'captured_faces')
+            object_dir = os.path.join(base_dir, self._sanitize_filename(object_name))
+            os.makedirs(object_dir, exist_ok=True)
+            
+            # Generate filename with timestamp
+            timestamp = int(time.time())
+            filename = f"{timestamp}_{self._sanitize_filename(object_name)}.jpg"
+            filepath = os.path.join(object_dir, filename)
+            
+            # Convert BGR to RGB for PIL
+            face_rgb = cv2.cvtColor(face_roi, cv2.COLOR_BGR2RGB)
+            
+            # Save face image
+            pil_image = Image.fromarray(face_rgb)
+            pil_image.save(filepath, 'JPEG', quality=85)
+            
+            self.logger.info(f"Captured face for {object_name}: {filepath}")
+            return filepath
+            
+        except Exception as e:
+            self.logger.error(f"Error capturing face: {e}")
+            return None
+    
+    def _sanitize_filename(self, filename: str) -> str:
+        """
+        Sanitize filename by removing invalid characters.
+        
+        Args:
+            filename: Original filename
+            
+        Returns:
+            Sanitized filename
+        """
+        # Replace invalid characters with underscores
+        invalid_chars = '<>:"/\\|?*'
+        for char in invalid_chars:
+            filename = filename.replace(char, '_')
+        
+        # Remove leading/trailing spaces and dots
+        filename = filename.strip(' .')
+        
+        # Ensure filename is not empty
+        if not filename:
+            filename = 'unknown'
+        
+        return filename
+    
+    def get_captured_faces_count(self, object_name: str = None) -> Dict[str, int]:
+        """
+        Get count of captured faces for objects.
+        
+        Args:
+            object_name: Specific object name, or None for all objects
+            
+        Returns:
+            Dictionary with face counts
+        """
+        try:
+            base_dir = os.path.join(os.getcwd(), 'data', 'captured_faces')
+            
+            if not os.path.exists(base_dir):
+                return {}
+            
+            counts = {}
+            
+            if object_name:
+                # Get count for specific object
+                object_dir = os.path.join(base_dir, self._sanitize_filename(object_name))
+                if os.path.exists(object_dir):
+                    files = [f for f in os.listdir(object_dir) 
+                            if os.path.isfile(os.path.join(object_dir, f))]
+                    counts[object_name] = len(files)
+            else:
+                # Get counts for all objects
+                for item in os.listdir(base_dir):
+                    object_dir = os.path.join(base_dir, item)
+                    if os.path.isdir(object_dir):
+                        files = [f for f in os.listdir(object_dir) 
+                                if os.path.isfile(os.path.join(object_dir, f))]
+                        counts[item] = len(files)
+            
+            return counts
+            
+        except Exception as e:
+            self.logger.error(f"Error getting captured faces count: {e}")
+            return {}
+    
+    def cleanup_old_captured_faces(self, days: int = 30) -> int:
+        """
+        Remove captured faces older than specified days.
+        
+        Args:
+            days: Number of days to keep faces
+            
+        Returns:
+            Number of files removed
+        """
+        try:
+            base_dir = os.path.join(os.getcwd(), 'data', 'captured_faces')
+            
+            if not os.path.exists(base_dir):
+                return 0
+            
+            current_time = time.time()
+            cutoff_time = current_time - (days * 24 * 60 * 60)
+            removed_count = 0
+            
+            for object_name in os.listdir(base_dir):
+                object_dir = os.path.join(base_dir, object_name)
+                if os.path.isdir(object_dir):
+                    for filename in os.listdir(object_dir):
+                        file_path = os.path.join(object_dir, filename)
+                        if os.path.isfile(file_path):
+                            # Extract timestamp from filename
+                            try:
+                                timestamp_str = filename.split('_')[0]
+                                file_time = int(timestamp_str)
+                                
+                                if file_time < cutoff_time:
+                                    os.remove(file_path)
+                                    removed_count += 1
+                                    self.logger.info(f"Removed old captured face: {file_path}")
+                            except (ValueError, IndexError):
+                                # If we can't parse timestamp, skip the file
+                                continue
+            
+            # Remove empty directories
+            for object_name in os.listdir(base_dir):
+                object_dir = os.path.join(base_dir, object_name)
+                if os.path.isdir(object_dir) and not os.listdir(object_dir):
+                    os.rmdir(object_dir)
+                    self.logger.info(f"Removed empty directory: {object_dir}")
+            
+            return removed_count
+            
+        except Exception as e:
+            self.logger.error(f"Error cleaning up old captured faces: {e}")
             return 0
 
 

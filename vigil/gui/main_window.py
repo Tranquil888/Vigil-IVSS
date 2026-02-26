@@ -18,8 +18,10 @@ from vigil.video.capture import video_capture
 from vigil.video.processing import frame_processor
 from vigil.recognition.face_detector import face_detector
 from vigil.gui.dialogs.object_dialogs import AddObjectDialog, EditObjectDialog, DeleteObjectDialog
+from vigil.gui.dialogs.event_journal_dialog import EventJournalDialog
 from vigil.recognition.training_service import training_service
 from vigil.events.logger import event_logger
+from vigil.events.session_manager import session_manager
 from vigil.config.settings import settings
 
 
@@ -384,6 +386,19 @@ class MainWindow:
         """Handle window closing event."""
         if messagebox.askokcancel("Quit", "Do you want to quit Vigil?"):
             self.logger.info("Application closing")
+            
+            # Stop camera if running
+            if self.is_camera_running:
+                video_capture.stop_capture()
+                self.is_camera_running = False
+            
+            # Shutdown session manager
+            try:
+                session_manager.shutdown()
+                self.logger.info("Session manager shutdown complete")
+            except Exception as e:
+                self.logger.error(f"Error shutting down session manager: {e}")
+            
             self.root.quit()
     
     # Menu command methods (placeholders for now)
@@ -901,7 +916,12 @@ class MainWindow:
         if not authz_manager.can_view_events(self.current_role):
             messagebox.showerror("Access Denied", "You don't have permission to view events")
             return
-        messagebox.showinfo("View Events", "View events feature coming soon")
+        
+        try:
+            EventJournalDialog(self.root, self)
+        except Exception as e:
+            self.logger.error(f"Error opening event journal: {e}")
+            messagebox.showerror("Error", f"Failed to open event journal: {e}")
     
     def _export_events(self) -> None:
         if not authz_manager.can_export_events(self.current_role):
@@ -1181,7 +1201,13 @@ class MainWindow:
                                 filtered_faces.append(face)
                                 self.last_recognition_time[face_name] = float(time.time())
                                 
-                                # Log recognition event
+                                # Log recognition event to session manager
+                                session_manager.add_recognition_event(
+                                    face_name, confidence, frame, 
+                                    face['location'], 'Person'
+                                )
+                                
+                                # Log to traditional event logger
                                 event_logger.log_face_recognition(
                                     face_name, 
                                     confidence,
@@ -1193,6 +1219,13 @@ class MainWindow:
                     else:
                         # For unknown faces, still log them
                         filtered_faces.append(face)
+                        
+                        # Log unknown face to session manager
+                        session_manager.add_recognition_event(
+                            'Unknown', confidence, frame, 
+                            face['location'], 'Unknown'
+                        )
+                        
                         event_logger.log_unknown_face(
                             confidence,
                             camera_source=str(video_capture.current_source)

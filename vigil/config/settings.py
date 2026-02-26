@@ -79,6 +79,8 @@ class SettingsManager:
                 ('video_loop_playback', '0', None, None, None, None, None, None, None, None, None),  # Loop video playback
                 ('video_progress_show', '1', None, None, None, None, None, None, None, None, None),  # Show video progress bar
                 ('video_playback_speed', '1.0', None, None, None, None, None, None, None, None, None),  # Video playback speed multiplier
+                # Event journal settings
+                ('event_inactivity_delay', '10', None, None, None, None, None, None, None, None, None),  # Event inactivity delay in seconds
             ]
             
             for default in defaults:

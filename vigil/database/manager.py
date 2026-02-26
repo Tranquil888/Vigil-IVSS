@@ -401,6 +401,171 @@ class CameraDatabase(DatabaseManager):
         return affected > 0
 
 
+class EventSessionsDatabase(DatabaseManager):
+    """Manages event sessions and photos database for journal functionality."""
+    
+    def __init__(self):
+        super().__init__(os.path.join(os.getcwd(), 'data/events.db'))
+        self._create_tables()
+    
+    def _create_tables(self) -> None:
+        """Create event sessions and photos tables."""
+        # Event sessions table
+        sessions_query = '''
+            CREATE TABLE IF NOT EXISTS event_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                start_time TEXT NOT NULL,
+                end_time TEXT,
+                duration INTEGER,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        '''
+        self.execute_update(sessions_query)
+        
+        # Event photos table
+        photos_query = '''
+            CREATE TABLE IF NOT EXISTS event_photos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_id INTEGER,
+                object_name TEXT,
+                photo_path TEXT,
+                timestamp TEXT,
+                confidence REAL,
+                FOREIGN KEY (event_id) REFERENCES event_sessions (id)
+            )
+        '''
+        self.execute_update(photos_query)
+        
+        # Event objects table for tracking objects in sessions
+        objects_query = '''
+            CREATE TABLE IF NOT EXISTS event_objects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_id INTEGER,
+                object_name TEXT,
+                object_type TEXT,
+                confidence REAL,
+                timestamp TEXT,
+                FOREIGN KEY (event_id) REFERENCES event_sessions (id)
+            )
+        '''
+        self.execute_update(objects_query)
+        
+        # Create indexes for better performance
+        self.execute_update('CREATE INDEX IF NOT EXISTS idx_sessions_start_time ON event_sessions(start_time)')
+        self.execute_update('CREATE INDEX IF NOT EXISTS idx_photos_event_id ON event_photos(event_id)')
+        self.execute_update('CREATE INDEX IF NOT EXISTS idx_objects_event_id ON event_objects(event_id)')
+    
+    def create_event_session(self, start_time: str, description: str = None) -> int:
+        """Create a new event session."""
+        query = 'INSERT INTO event_sessions (start_time, description) VALUES (?, ?)'
+        
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, (start_time, description))
+                conn.commit()
+                
+                # Get the last insert rowid from the same connection
+                cursor.execute('SELECT last_insert_rowid()')
+                result = cursor.fetchone()
+                
+                if result:
+                    return result[0]
+                else:
+                    return 0
+                    
+        except sqlite3.Error as e:
+            self.logger.error(f"Failed to create event session: {e}")
+            return 0
+    
+    def end_event_session(self, session_id: int, end_time: str, duration: int) -> bool:
+        """End an event session."""
+        query = 'UPDATE event_sessions SET end_time = ?, duration = ? WHERE id = ?'
+        affected = self.execute_update(query, (end_time, duration, session_id))
+        return affected > 0
+    
+    def add_event_photo(self, event_id: int, object_name: str, photo_path: str, 
+                       timestamp: str, confidence: float) -> int:
+        """Add a photo to an event session."""
+        query = '''
+            INSERT INTO event_photos (event_id, object_name, photo_path, timestamp, confidence)
+            VALUES (?, ?, ?, ?, ?)
+        '''
+        self.execute_update(query, (event_id, object_name, photo_path, timestamp, confidence))
+        
+        result = self.execute_query('SELECT last_insert_rowid()')
+        return result[0]['last_insert_rowid()']
+    
+    def add_event_object(self, event_id: int, object_name: str, object_type: str, 
+                        timestamp: str, confidence: float) -> int:
+        """Add an object recognition to an event session."""
+        query = '''
+            INSERT INTO event_objects (event_id, object_name, object_type, timestamp, confidence)
+            VALUES (?, ?, ?, ?, ?)
+        '''
+        self.execute_update(query, (event_id, object_name, object_type, timestamp, confidence))
+        
+        result = self.execute_query('SELECT last_insert_rowid()')
+        return result[0]['last_insert_rowid()']
+    
+    def get_event_sessions(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """Get all event sessions."""
+        query = '''
+            SELECT id, start_time, end_time, duration, description, created_at
+            FROM event_sessions
+            ORDER BY start_time DESC
+            LIMIT ?
+        '''
+        results = self.execute_query(query, (limit,))
+        return [dict(row) for row in results]
+    
+    def get_event_session(self, session_id: int) -> Optional[Dict[str, Any]]:
+        """Get a specific event session."""
+        query = 'SELECT * FROM event_sessions WHERE id = ?'
+        results = self.execute_query(query, (session_id,))
+        
+        if results:
+            return dict(results[0])
+        return None
+    
+    def get_event_photos(self, session_id: int) -> List[Dict[str, Any]]:
+        """Get all photos for an event session."""
+        query = '''
+            SELECT id, object_name, photo_path, timestamp, confidence
+            FROM event_photos
+            WHERE event_id = ?
+            ORDER BY timestamp
+        '''
+        results = self.execute_query(query, (session_id,))
+        return [dict(row) for row in results]
+    
+    def get_event_objects(self, session_id: int) -> List[Dict[str, Any]]:
+        """Get all objects recognized in an event session."""
+        query = '''
+            SELECT id, object_name, object_type, timestamp, confidence
+            FROM event_objects
+            WHERE event_id = ?
+            ORDER BY timestamp
+        '''
+        results = self.execute_query(query, (session_id,))
+        return [dict(row) for row in results]
+    
+    def delete_event_session(self, session_id: int) -> bool:
+        """Delete an event session and all related photos and objects."""
+        try:
+            # Delete related photos and objects first
+            self.execute_update('DELETE FROM event_photos WHERE event_id = ?', (session_id,))
+            self.execute_update('DELETE FROM event_objects WHERE event_id = ?', (session_id,))
+            
+            # Delete the session
+            query = 'DELETE FROM event_sessions WHERE id = ?'
+            affected = self.execute_update(query, (session_id,))
+            return affected > 0
+        except Exception:
+            return False
+
+
 # Database factory functions
 def get_settings_db() -> SettingsDatabase:
     """Get settings database instance."""
@@ -417,3 +582,7 @@ def get_objects_db() -> ObjectsDatabase:
 def get_camera_db() -> CameraDatabase:
     """Get camera database instance."""
     return CameraDatabase()
+
+def get_events_db() -> EventSessionsDatabase:
+    """Get event sessions database instance."""
+    return EventSessionsDatabase()
