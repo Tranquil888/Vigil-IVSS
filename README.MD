@@ -9,6 +9,7 @@ The system is designed to be a cost-effective, functional alternative to expensi
 - [System Requirements](#-system-requirements)
 - [Installation](#-installation)
 - [Usage](#-usage)
+- [Event Journal](#-event-journal)
 - [Project Structure](#-project-structure)
 - [License](#-license)
 
@@ -23,6 +24,7 @@ The system is designed to be a cost-effective, functional alternative to expensi
 - **Automatic Logging**: Logs events with timestamps and recognition confidence
 - **Media Capture**: Saves photo and video clips of specific events
 - **Searchable Journal**: Provides a searchable event log filterable by date or object
+- **Event Journal**: Advanced event session management with photo galleries and detailed object tracking
 
 ### Object Management
 - **Profile Management**: Create, edit, and delete observed objects (profiles)
@@ -115,7 +117,122 @@ pip install -r requirements.txt
 - **View Events**: Event Log → Filter by date/object type
 - **Camera Settings**: Administration → Camera Configuration
 
-## 📁 Project Structure
+## � Event Journal
+
+The Event Journal is an advanced feature that provides comprehensive event session management with photo galleries and detailed object tracking.
+
+### 🎯 Key Features
+
+#### Event Session Management
+- **Automatic Session Grouping**: Groups recognition events into sessions based on inactivity periods
+- **Configurable Inactivity Delay**: Default 10 seconds (adjustable by admin users)
+- **Session Duration Tracking**: Automatically calculates and displays session durations
+- **Event Descriptions**: Generates descriptive names with event counters and object counts
+
+#### Photo Capture & Gallery
+- **Automatic Face Capture**: Captures and saves face images for recognized objects (excludes 'Unknown')
+- **Organized Storage**: Photos stored in `data/captured_faces/` with timestamp-based naming
+- **Responsive Photo Grid**: Adapts to window size (2-8 columns based on available space)
+- **Vertical Scrolling**: Smooth scrolling through all captured photos
+- **Thumbnail Display**: 120x120px thumbnails with object names and timestamps
+
+#### Event Details & Analysis
+- **Event Table**: Lists all sessions with ID, start time, duration, and description
+- **Object Tracking**: Detailed view of all recognized objects per event
+- **Confidence Scores**: Shows recognition confidence for each object
+- **Timestamp Tracking**: Precise timestamps for all recognition events
+
+#### User Interface
+- **Resizable Window**: Full window controls (minimize, maximize, close)
+- **Responsive Layout**: Adapts to different screen sizes
+- **Admin Controls**: Event delay settings and delete event functionality
+- **Date Filtering**: Filter events by date range (feature placeholder)
+- **Export Capability**: Export event data (feature placeholder)
+
+### 🔧 Configuration
+
+#### Event Inactivity Delay
+- **Default**: 10 seconds
+- **Access**: Admin users only
+- **Location**: Event Journal → First row of controls
+- **Purpose**: Determines when to start a new event session after inactivity
+
+#### Photo Storage
+- **Location**: `data/captured_faces/{object_name}/{timestamp}.jpg`
+- **Format**: JPEG with automatic filename sanitization
+- **Size**: Original capture size with face padding
+- **Cleanup**: Manual management through file system
+
+### 📱 Usage Guide
+
+#### Accessing Event Journal
+1. **Login** to the Vigil system
+2. Navigate to **Events** → **View Events**
+3. The Event Journal window will open with the event list
+
+#### Viewing Event Details
+1. **Select an event** from the events table
+2. **View object details** in the middle panel
+3. **Browse photos** in the photo gallery below
+4. **Resize window** to adjust photo grid layout
+
+#### Admin Operations
+1. **Configure delay**: Set "Event Delay (s)" and click "Update"
+2. **Delete events**: Select event and click "Delete Event" (admin only)
+3. **Export data**: Click "Export" to save event data (admin only)
+
+### 🎨 Responsive Photo Grid
+
+The photo gallery automatically adapts to window size:
+- **Small windows** (< 280px): 2 columns
+- **Medium windows** (280-560px): 2-4 columns
+- **Large windows** (560-840px): 4-6 columns
+- **Extra large windows** (> 840px): 6-8 columns
+
+Photos reorganize automatically when resizing the window, ensuring optimal visibility and no images are thrown off-screen.
+
+### 🔐 Role-Based Access
+
+#### Administrator Users
+- **Full access** to all Event Journal features
+- **Configure** event inactivity delay
+- **Delete** individual events
+- **Export** event data
+- **View** all photos and details
+
+#### Operator Users
+- **View** events and photos
+- **Browse** event details
+- **No access** to admin settings
+- **Cannot delete** events
+
+### 📊 Database Schema
+
+The Event Journal uses three main tables in `data/events.db`:
+
+#### `event_sessions`
+- `id`: Session identifier
+- `start_time`: Session start timestamp
+- `end_time`: Session end timestamp
+- `duration`: Session duration in seconds
+- `description`: Auto-generated description
+
+#### `event_objects`
+- `id`: Object record identifier
+- `session_id`: Link to event session
+- `object_name`: Recognized object name
+- `object_type`: Object classification
+- `timestamp`: Recognition timestamp
+- `confidence`: Recognition confidence score
+
+#### `event_photos`
+- `id`: Photo record identifier
+- `session_id`: Link to event session
+- `photo_path`: File path to captured photo
+- `timestamp`: Photo capture timestamp
+- `object_name`: Object in the photo
+
+## �� Project Structure
 
 ### Modular Architecture (New)
 ```
