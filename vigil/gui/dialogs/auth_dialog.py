@@ -22,7 +22,7 @@ class AuthenticationDialog:
         """Show the authentication dialog and return user credentials."""
         self.window = tk.Toplevel(self.parent)
         self.window.title("Vigil - Authentication")
-        self.window.geometry("400x300")
+        self.window.geometry("400x350")
         self.window.resizable(False, False)
         
         # Center the dialog
@@ -46,8 +46,8 @@ class AuthenticationDialog:
         """Center the dialog on the parent window."""
         self.window.update_idletasks()
         x = (self.window.winfo_screenwidth() // 2) - (400 // 2)
-        y = (self.window.winfo_screenheight() // 2) - (300 // 2)
-        self.window.geometry(f'400x300+{x}+{y}')
+        y = (self.window.winfo_screenheight() // 2) - (350 // 2)
+        self.window.geometry(f'400x350+{x}+{y}')
     
     def _create_widgets(self) -> None:
         """Create dialog widgets."""
@@ -88,7 +88,7 @@ class AuthenticationDialog:
         
         # Buttons frame
         buttons_frame = tk.Frame(self.window)
-        buttons_frame.pack(pady=20)
+        buttons_frame.pack(pady=25)
         
         login_button = ttk.Button(
             buttons_frame,
@@ -160,7 +160,7 @@ class CreateUserDialog:
         """Show the create user dialog and return success status."""
         self.window = tk.Toplevel(self.parent)
         self.window.title("Create New User")
-        self.window.geometry("400x350")
+        self.window.geometry("400x400")
         self.window.resizable(False, False)
         
         # Center the dialog
@@ -184,8 +184,8 @@ class CreateUserDialog:
         """Center the dialog on the parent window."""
         self.window.update_idletasks()
         x = (self.window.winfo_screenwidth() // 2) - (400 // 2)
-        y = (self.window.winfo_screenheight() // 2) - (350 // 2)
-        self.window.geometry(f'400x350+{x}+{y}')
+        y = (self.window.winfo_screenheight() // 2) - (400 // 2)
+        self.window.geometry(f'400x400+{x}+{y}')
     
     def _create_widgets(self) -> None:
         """Create dialog widgets."""
@@ -238,7 +238,7 @@ class CreateUserDialog:
         
         # Buttons frame
         buttons_frame = tk.Frame(self.window)
-        buttons_frame.pack(pady=15)
+        buttons_frame.pack(pady=20)
         
         create_button = ttk.Button(
             buttons_frame,
