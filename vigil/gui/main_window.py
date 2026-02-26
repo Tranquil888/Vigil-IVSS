@@ -378,9 +378,11 @@ class MainWindow:
             return
         
         # Enable/disable based on permissions
-        can_manage_users = authz_manager.can_manage_users(self.current_role)
-        self.users_menu.entryconfig("Create User", state='normal' if can_manage_users else 'disabled')
-        self.users_menu.entryconfig("User List", state='normal' if can_manage_users else 'disabled')
+        can_create_users = authz_manager.can_manage_users(self.current_role)
+        can_view_users = authz_manager.can_view_user_list(self.current_role)
+        
+        self.users_menu.entryconfig("Create User", state='normal' if can_create_users else 'disabled')
+        self.users_menu.entryconfig("User List", state='normal' if can_view_users else 'disabled')
     
     def _on_closing(self) -> None:
         """Handle window closing event."""
@@ -412,10 +414,13 @@ class MainWindow:
         dialog.show()
     
     def _user_list(self) -> None:
-        if not authz_manager.can_manage_users(self.current_role):
-            messagebox.showerror("Access Denied", "You don't have permission to manage users")
+        if not authz_manager.can_view_user_list(self.current_role):
+            messagebox.showerror("Access Denied", "You don't have permission to view user list")
             return
-        messagebox.showinfo("User List", "User list feature coming soon")
+        
+        from vigil.gui.dialogs.user_list_dialog import UserListDialog
+        dialog = UserListDialog(self.root, self.current_role)
+        dialog.show()
     
     def _add_object(self) -> None:
         """Add a new object."""

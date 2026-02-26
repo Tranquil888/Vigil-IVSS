@@ -20,7 +20,7 @@ class AuthorizationManager:
         self.permissions = {
             ROLE_ADMIN: {
                 # User management
-                'create_user', 'delete_user', 'view_users', 'edit_user',
+                'create_user', 'delete_user', 'view_users', 'edit_user', 'view_user_list',
                 # Object management
                 'create_object', 'delete_object', 'edit_object', 'view_objects',
                 'train_model', 'view_dataset',
@@ -37,6 +37,8 @@ class AuthorizationManager:
                 'admin_access'
             },
             ROLE_OPERATOR: {
+                # Limited user management
+                'view_users', 'view_user_list',
                 # Limited object management
                 'view_objects', 'edit_object',
                 # Camera viewing only
@@ -116,6 +118,10 @@ class AuthorizationManager:
     def can_stream_video(self, user_role: str) -> bool:
         """Check if user can stream video."""
         return self.has_permission(user_role, 'start_streaming')
+    
+    def can_view_user_list(self, user_role: str) -> bool:
+        """Check if user can view user list."""
+        return self.has_permission(user_role, 'view_user_list')
 
 
 # Global authorization instance
