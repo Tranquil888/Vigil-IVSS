@@ -646,6 +646,107 @@ class EventSessionsDatabase(DatabaseManager):
         results = self.execute_query(query, (session_id,))
         return [dict(row) for row in results]
     
+    def get_all_photos(self, date_from: str = None, date_to: str = None, 
+                    object_name: str = None, limit: int = 1000, offset: int = 0) -> List[Dict[str, Any]]:
+        """
+        Get all photos with optional filtering.
+        
+        Args:
+            date_from: Start date filter (YYYY-MM-DD format)
+            date_to: End date filter (YYYY-MM-DD format)
+            object_name: Object name filter (partial match)
+            limit: Maximum number of photos to return
+            offset: Number of photos to skip
+            
+        Returns:
+            List of photo records
+        """
+        try:
+            # Build query with filters
+            query = '''
+                SELECT ep.id, ep.event_id, ep.object_name, ep.photo_path, 
+                       ep.timestamp, ep.confidence,
+                       es.start_time, es.description
+                FROM event_photos ep
+                JOIN event_sessions es ON ep.event_id = es.id
+                WHERE 1=1
+            '''
+            params = []
+            
+            # Add date filters
+            if date_from:
+                query += ' AND DATE(es.start_time) >= DATE(?)'
+                params.append(date_from)
+            
+            if date_to:
+                query += ' AND DATE(es.start_time) <= DATE(?)'
+                params.append(date_to)
+            
+            # Add object filter
+            if object_name:
+                query += ' AND ep.object_name LIKE ?'
+                params.append(f'%{object_name}%')
+            
+            # Add ordering and pagination
+            query += ' ORDER BY ep.timestamp DESC LIMIT ? OFFSET ?'
+            params.extend([limit, offset])
+            
+            results = self.execute_query(query, tuple(params))
+            return [dict(row) for row in results]
+            
+        except Exception as e:
+            self.logger.error(f"Error getting all photos: {e}")
+            return []
+    
+    def get_available_dates(self) -> List[str]:
+        """
+        Get list of available dates for filtering.
+        
+        Returns:
+            List of date strings in YYYY-MM-DD format, sorted descending
+        """
+        try:
+            query = '''
+                SELECT DISTINCT DATE(es.start_time) as date
+                FROM event_sessions es
+                JOIN event_photos ep ON es.id = ep.event_id
+                ORDER BY date DESC
+            '''
+            results = self.execute_query(query)
+            dates = [row[0] for row in results]
+            return dates
+            
+        except Exception as e:
+            self.logger.error(f"Error getting available dates: {e}")
+            return []
+    
+    def delete_photos(self, photo_ids: List[int]) -> bool:
+        """
+        Delete specific photos by their IDs.
+        
+        Args:
+            photo_ids: List of photo IDs to delete
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            if not photo_ids:
+                return False
+            
+            # Build placeholders for IN clause
+            placeholders = ','.join(['?' for _ in photo_ids])
+            
+            query = f'DELETE FROM event_photos WHERE id IN ({placeholders})'
+            affected = self.execute_update(query, tuple(photo_ids))
+            
+            self.logger.info(f"Deleted {len(photo_ids)} photos from database")
+            return affected > 0
+            
+        except Exception as e:
+            self.logger.error(f"Error deleting photos: {e}")
+            return False
+    
     def delete_event_session(self, session_id: int) -> bool:
         """Delete an event session and all related photos, objects, and videos."""
         try:

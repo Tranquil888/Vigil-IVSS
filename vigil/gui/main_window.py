@@ -116,6 +116,7 @@ class MainWindow:
         events_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Events", menu=events_menu)
         events_menu.add_command(label="View Events", command=self._view_events)
+        events_menu.add_command(label="Event Images", command=self._view_photo_journal)
         events_menu.add_command(label="Export Events", command=self._export_events)
         
         # Settings menu
@@ -313,6 +314,8 @@ class MainWindow:
         events_controls = ttk.Frame(self.events_frame)
         events_controls.pack(fill='x', padx=5, pady=5)
         
+        ttk.Button(events_controls, text="View Events", command=self._view_events).pack(side='left', padx=2)
+        ttk.Button(events_controls, text="Event Images", command=self._view_photo_journal).pack(side='left', padx=2)
         ttk.Button(events_controls, text="Refresh", command=self._refresh_events).pack(side='left', padx=2)
         ttk.Button(events_controls, text="Export", command=self._export_events).pack(side='left', padx=2)
         ttk.Button(events_controls, text="Clear", command=self._clear_events).pack(side='left', padx=2)
@@ -927,6 +930,19 @@ class MainWindow:
         except Exception as e:
             self.logger.error(f"Error opening event journal: {e}")
             messagebox.showerror("Error", f"Failed to open event journal: {e}")
+    
+    def _view_photo_journal(self) -> None:
+        """Open photo journal dialog."""
+        if not authz_manager.can_view_events(self.current_role):
+            messagebox.showerror("Access Denied", "You don't have permission to view events")
+            return
+        
+        try:
+            from vigil.gui.dialogs.photo_journal_dialog import PhotoJournalDialog
+            PhotoJournalDialog(self.root, self).show()
+        except Exception as e:
+            self.logger.error(f"Error opening photo journal: {e}")
+            messagebox.showerror("Error", f"Failed to open photo journal: {e}")
     
     def _export_events(self) -> None:
         if not authz_manager.can_export_events(self.current_role):
