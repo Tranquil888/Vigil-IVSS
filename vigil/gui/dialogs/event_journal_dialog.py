@@ -250,6 +250,8 @@ class EventJournalDialog:
         
         # Left buttons
         ttk.Button(button_frame, text="Refresh", command=self._load_events).pack(side=tk.LEFT, padx=(0, 5))
+        self.video_button = ttk.Button(button_frame, text="Open Video", command=self._open_video, state="disabled")
+        self.video_button.pack(side=tk.LEFT, padx=(0, 5))
         
         if self.main_window and authz_manager.has_permission(self.main_window.current_role, 'admin'):
             ttk.Button(button_frame, text="Delete Event", command=self._delete_event).pack(side=tk.LEFT, padx=(0, 5))
@@ -345,6 +347,15 @@ class EventJournalDialog:
             self.event_id_label.config(text=str(event_id))
             self.start_time_label.config(text=session['start_time'])
             self.duration_label.config(text=f"{session.get('duration', 0)} seconds")
+            
+            # Check for videos and update button state
+            videos = self.db.get_event_videos(event_id)
+            if videos:
+                self.video_button.config(state="normal")
+                self.status_var.set(f"Event has {len(videos)} video(s) available")
+            else:
+                self.video_button.config(state="disabled")
+                self.status_var.set("No video available for this event")
             
             # Load objects and photos (without filters initially)
             self._load_event_objects(event_id)
@@ -694,6 +705,43 @@ class EventJournalDialog:
         for widget in self.photos_frame_inner.winfo_children():
             widget.destroy()
         self.photo_thumbnails.clear()
+        
+        # Disable video button
+        self.video_button.config(state="disabled")
+    
+    def _open_video(self) -> None:
+        """Open video player for selected event."""
+        if not self.selected_event_id:
+            return
+        
+        try:
+            # Get videos for this event
+            videos = self.db.get_event_videos(self.selected_event_id)
+            
+            if not videos:
+                messagebox.showinfo("No Video", "No video available for this event.")
+                return
+            
+            # For now, open the first video (could add selection dialog for multiple videos)
+            video = videos[0]
+            video_path = video['video_path']
+            
+            # Check if video file exists
+            if not os.path.exists(video_path):
+                messagebox.showerror("Video Not Found", f"Video file not found:\n{video_path}")
+                return
+            
+            # Open video player dialog
+            from vigil.gui.dialogs.video_player_dialog import VideoPlayerDialog
+            
+            title = f"Event Video - Event {self.selected_event_id:05d}"
+            player = VideoPlayerDialog(self.dialog, video_path, title)
+            
+            self.logger.info(f"Opened video player for event {self.selected_event_id}: {video_path}")
+            
+        except Exception as e:
+            self.logger.error(f"Error opening video: {e}")
+            messagebox.showerror("Error", f"Failed to open video: {e}")
     
     def _on_closing(self) -> None:
         """Handle dialog closing."""

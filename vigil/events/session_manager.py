@@ -11,6 +11,7 @@ from vigil.database.manager import get_events_db
 from vigil.utils.dataset_manager import dataset_manager
 from vigil.utils.logging_config import get_events_logger
 from vigil.config.settings import settings
+from vigil.video.event_buffer import event_video_buffer
 
 
 class EventSessionManager:
@@ -149,6 +150,9 @@ class EventSessionManager:
             self.session_start_time = current_time
             self.last_activity_time = current_time
             
+            # Start video capture for this event
+            self._start_event_video(session_id, timestamp)
+            
             # Start inactivity timer
             self._reset_session_timer()
             
@@ -158,6 +162,32 @@ class EventSessionManager:
         except Exception as e:
             self.logger.error(f"Error starting new session: {e}")
             return None
+    
+    def _start_event_video(self, session_id: int, timestamp: str) -> None:
+        """Start video capture for event."""
+        try:
+            # Start video capture in background thread
+            video_thread = threading.Thread(
+                target=self._capture_event_video,
+                args=(session_id, timestamp),
+                daemon=True
+            )
+            video_thread.start()
+            
+        except Exception as e:
+            self.logger.error(f"Error starting event video: {e}")
+    
+    def _capture_event_video(self, session_id: int, timestamp: str) -> None:
+        """Capture video for event (runs in background thread)."""
+        try:
+            video_path = event_video_buffer.start_event_capture(session_id, timestamp)
+            if video_path:
+                self.logger.info(f"Event video captured: {video_path}")
+            else:
+                self.logger.warning("No video captured for event")
+                
+        except Exception as e:
+            self.logger.error(f"Error capturing event video: {e}")
     
     def _end_current_session(self) -> None:
         """End the current event session."""
@@ -232,6 +262,9 @@ class EventSessionManager:
             True if event added successfully
         """
         try:
+            # Feed frame to video buffer
+            event_video_buffer.add_frame(frame)
+            
             # Ensure we have an active session
             session_id = self.start_session_if_needed()
             if session_id is None:
@@ -268,6 +301,22 @@ class EventSessionManager:
         except Exception as e:
             self.logger.error(f"Error adding recognition event: {e}")
             return False
+    
+    def feed_frame_to_buffer(self, frame) -> None:
+        """
+        Feed a frame to the video buffer (call this continuously).
+        
+        Args:
+            frame: Video frame to add to buffer
+        """
+        try:
+            event_video_buffer.add_frame(frame)
+        except Exception as e:
+            self.logger.error(f"Error feeding frame to buffer: {e}")
+    
+    def get_buffer_info(self) -> Dict[str, Any]:
+        """Get video buffer information."""
+        return event_video_buffer.get_buffer_info()
     
     def get_active_session_info(self) -> Optional[Dict[str, Any]]:
         """Get information about the currently active session."""

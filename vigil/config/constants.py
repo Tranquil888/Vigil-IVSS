@@ -2,6 +2,8 @@
 Application constants for Vigil surveillance system.
 """
 
+import os
+
 # Database file paths
 SETTING_DB_PATH = "data/setting.db"
 AUTH_DB_PATH = "data/authentication.db"
@@ -47,3 +49,8 @@ LOG_FORMAT = "%(asctime)s | %(levelname)s | %(message)s"
 # Security
 MAX_LOGIN_ATTEMPTS = 3
 SESSION_TIMEOUT = 3600  # 1 hour
+
+
+def get_data_dir() -> str:
+    """Get the data directory path."""
+    return "data"

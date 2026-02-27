@@ -451,10 +451,27 @@ class EventSessionsDatabase(DatabaseManager):
         '''
         self.execute_update(objects_query)
         
+        # Event videos table for storing video clips
+        videos_query = '''
+            CREATE TABLE IF NOT EXISTS event_videos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_id INTEGER,
+                video_path TEXT,
+                start_time TEXT,
+                end_time TEXT,
+                duration INTEGER,
+                file_size INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (event_id) REFERENCES event_sessions (id)
+            )
+        '''
+        self.execute_update(videos_query)
+        
         # Create indexes for better performance
         self.execute_update('CREATE INDEX IF NOT EXISTS idx_sessions_start_time ON event_sessions(start_time)')
         self.execute_update('CREATE INDEX IF NOT EXISTS idx_photos_event_id ON event_photos(event_id)')
         self.execute_update('CREATE INDEX IF NOT EXISTS idx_objects_event_id ON event_objects(event_id)')
+        self.execute_update('CREATE INDEX IF NOT EXISTS idx_videos_event_id ON event_videos(event_id)')
     
     def create_event_session(self, start_time: str, description: str = None) -> int:
         """Create a new event session."""
@@ -591,12 +608,51 @@ class EventSessionsDatabase(DatabaseManager):
         results = self.execute_query(query, tuple(params))
         return [dict(row) for row in results]
     
-    def delete_event_session(self, session_id: int) -> bool:
-        """Delete an event session and all related photos and objects."""
+    def add_event_video(self, event_id: int, video_path: str, start_time: str, 
+                       end_time: str, duration: int, file_size: int) -> int:
+        """Add a video clip to an event session."""
+        query = '''
+            INSERT INTO event_videos (event_id, video_path, start_time, end_time, duration, file_size)
+            VALUES (?, ?, ?, ?, ?, ?)
+        '''
+        
         try:
-            # Delete related photos and objects first
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, (event_id, video_path, start_time, end_time, duration, file_size))
+                conn.commit()
+                
+                # Get the last insert rowid from the same connection
+                cursor.execute('SELECT last_insert_rowid()')
+                result = cursor.fetchone()
+                
+                if result:
+                    return result[0]
+                else:
+                    return 0
+                    
+        except sqlite3.Error as e:
+            self.logger.error(f"Failed to add event video: {e}")
+            return 0
+    
+    def get_event_videos(self, session_id: int) -> List[Dict[str, Any]]:
+        """Get videos for an event session."""
+        query = '''
+            SELECT id, video_path, start_time, end_time, duration, file_size, created_at
+            FROM event_videos
+            WHERE event_id = ?
+            ORDER BY created_at
+        '''
+        results = self.execute_query(query, (session_id,))
+        return [dict(row) for row in results]
+    
+    def delete_event_session(self, session_id: int) -> bool:
+        """Delete an event session and all related photos, objects, and videos."""
+        try:
+            # Delete related photos, objects, and videos first
             self.execute_update('DELETE FROM event_photos WHERE event_id = ?', (session_id,))
             self.execute_update('DELETE FROM event_objects WHERE event_id = ?', (session_id,))
+            self.execute_update('DELETE FROM event_videos WHERE event_id = ?', (session_id,))
             
             # Delete the session
             query = 'DELETE FROM event_sessions WHERE id = ?'

@@ -1156,6 +1156,9 @@ class MainWindow:
             self.current_frame = frame.copy()
             self.frame_count += 1
             
+            # Feed frame to video buffer continuously
+            session_manager.feed_frame_to_buffer(frame)
+            
             # Get recognition settings
             frame_skip = int(settings.get_setting('recognition_frame_skip', '3'))
             confidence_threshold = float(settings.get_setting('recognition_confidence_threshold', '0.7'))
