@@ -305,6 +305,20 @@ class VideoPlayerDialog:
         if not self.cap or frame_number < 0 or frame_number >= self.total_frames:
             return
         
+        # Check if dialog still exists
+        try:
+            if not self.dialog.winfo_exists():
+                return
+        except tk.TclError:
+            return
+        
+        # Check if video label still exists
+        try:
+            if not self.video_label.winfo_exists():
+                return
+        except tk.TclError:
+            return
+        
         try:
             # Set frame position
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
@@ -317,9 +331,12 @@ class VideoPlayerDialog:
             # Convert color space (BGR to RGB)
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             
-            # Resize frame to fit display
-            display_width = self.video_label.winfo_width()
-            display_height = self.video_label.winfo_height()
+            # Resize frame to fit display (with widget existence check)
+            try:
+                display_width = self.video_label.winfo_width()
+                display_height = self.video_label.winfo_height()
+            except tk.TclError:
+                return  # Widget destroyed, exit early
             
             if display_width > 1 and display_height > 1:
                 # Calculate aspect ratio
@@ -338,21 +355,40 @@ class VideoPlayerDialog:
             image = Image.fromarray(frame_rgb)
             photo = ImageTk.PhotoImage(image)
             
-            # Update label
-            self.video_label.config(image=photo)
-            self.video_label.image = photo  # Keep reference
+            # Update label (check if widget still exists)
+            try:
+                if self.video_label.winfo_exists():
+                    self.video_label.config(image=photo)
+                    self.video_label.image = photo  # Keep reference
+            except tk.TclError:
+                pass  # Widget destroyed, ignore
             
         except Exception as e:
             self.logger.error(f"Error displaying frame {frame_number}: {e}")
     
     def _update_progress(self) -> None:
         """Update progress bar and time display."""
+        # Check if dialog still exists
+        try:
+            if not self.dialog.winfo_exists():
+                return
+        except tk.TclError:
+            return
+        
         if self.total_frames > 0:
             progress = (self.current_frame / self.total_frames) * 100
-            self.progress_var.set(progress)
             
-            current_time = self.current_frame / self.fps
-            self.time_var.set(f"{self._format_time(current_time)} / {self._format_time(self.duration)}")
+            try:
+                if hasattr(self, 'progress_var') and self.progress_var:
+                    self.progress_var.set(progress)
+                
+                if hasattr(self, 'time_label') and self.time_label.winfo_exists():
+                    current_time = self.current_frame / self.fps
+                    total_time = self.total_frames / self.fps
+                    time_text = f"{current_time:.1f}s / {total_time:.1f}s"
+                    self.time_label.config(text=time_text)
+            except tk.TclError:
+                pass  # Widgets destroyed, ignore
     
     def _format_time(self, seconds: float) -> str:
         """Format time in seconds to MM:SS format."""
@@ -400,7 +436,14 @@ class VideoPlayerDialog:
     def _playback_finished(self) -> None:
         """Handle playback completion."""
         self.is_playing = False
-        self.play_button.config(text="▶ Play")
+        
+        # Check if play button still exists before updating
+        try:
+            if hasattr(self, 'play_button') and self.play_button.winfo_exists():
+                self.play_button.config(text="▶ Play")
+        except tk.TclError:
+            pass  # Widget destroyed, ignore
+        
         self.logger.info("Video playback finished")
     
     def _on_closing(self) -> None:
