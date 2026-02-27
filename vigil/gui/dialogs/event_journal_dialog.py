@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from PIL import Image, ImageTk
 import os
+import re
 from typing import Dict, Any, List, Optional
 from vigil.database.manager import get_events_db
 from vigil.utils.logging_config import get_ui_logger
@@ -38,6 +39,7 @@ class EventJournalDialog:
         self.selected_event_id = None
         self.current_photos = []
         self.photo_thumbnails = []
+        self.status_var = tk.StringVar(value="Ready")
         
         # Create UI
         self._create_widgets()
@@ -84,7 +86,7 @@ class EventJournalDialog:
         filter_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
         filter_frame.columnconfigure(1, weight=1)
         
-        # First row - All controls including Event Delay
+        # First row - Date filters and Event Delay
         controls_frame = ttk.Frame(filter_frame)
         controls_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 5))
         
@@ -110,6 +112,24 @@ class EventJournalDialog:
             delay_entry = ttk.Entry(controls_frame, textvariable=self.delay_var, width=5)
             delay_entry.pack(side=tk.LEFT, padx=(0, 5))
             ttk.Button(controls_frame, text="Update", command=self._update_delay).pack(side=tk.LEFT)
+        
+        # Second row - Object and Type filters
+        object_frame = ttk.Frame(filter_frame)
+        object_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(5, 0))
+        
+        ttk.Label(object_frame, text="Object Name:").pack(side=tk.LEFT, padx=(0, 5))
+        self.object_name_var = tk.StringVar()
+        self.object_name_entry = ttk.Entry(object_frame, textvariable=self.object_name_var, width=15)
+        self.object_name_entry.pack(side=tk.LEFT, padx=(0, 10))
+        
+        ttk.Label(object_frame, text="Object Type:").pack(side=tk.LEFT, padx=(10, 5))
+        self.object_type_var = tk.StringVar()
+        self.object_type_combo = ttk.Combobox(object_frame, textvariable=self.object_type_var, width=12)
+        self.object_type_combo['values'] = ['Person', 'Unknown', 'Vehicle', 'Animal', 'Other']
+        self.object_type_combo.pack(side=tk.LEFT, padx=(0, 10))
+        
+        ttk.Button(object_frame, text="Apply Filters", command=self._apply_object_filters).pack(side=tk.LEFT, padx=(10, 5))
+        ttk.Button(object_frame, text="Clear Filters", command=self._clear_object_filters).pack(side=tk.LEFT, padx=(0, 5))
     
     def _create_events_table(self, parent) -> None:
         """Create events table."""
@@ -236,7 +256,14 @@ class EventJournalDialog:
         
         # Right buttons
         ttk.Button(button_frame, text="Export", command=self._export_event).pack(side=tk.RIGHT, padx=(5, 0))
-        ttk.Button(button_frame, text="Close", command=self._on_closing).pack(side=tk.RIGHT)
+        ttk.Button(button_frame, text="Close", command=self._on_closing).pack(side=tk.RIGHT, padx=(5, 0))
+        
+        # Status bar
+        status_frame = ttk.Frame(parent)
+        status_frame.grid(row=3, column=0, sticky=(tk.W, tk.E), pady=(5, 0))
+        
+        ttk.Label(status_frame, text="Status:").pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(status_frame, textvariable=self.status_var).pack(side=tk.LEFT)
     
     def _load_events(self) -> None:
         """Load events from database."""
@@ -245,8 +272,16 @@ class EventJournalDialog:
             for item in self.events_tree.get_children():
                 self.events_tree.delete(item)
             
-            # Get events from database
-            events = self.db.get_event_sessions(limit=200)
+            # Get date filter values
+            start_date = self.start_date_var.get().strip()
+            end_date = self.end_date_var.get().strip()
+            
+            # Get events from database with date filtering
+            events = self.db.get_event_sessions(
+                limit=200, 
+                start_date=start_date if start_date else None,
+                end_date=end_date if end_date else None
+            )
             
             # Add events to tree
             for event in events:
@@ -258,23 +293,26 @@ class EventJournalDialog:
                 # Format duration properly
                 if duration and duration > 0:
                     duration_str = f"{duration}s"
-                elif event.get('end_time') is None:
-                    duration_str = "Active"
                 else:
-                    duration_str = "0s"
+                    duration_str = "active"
                 
-                # Fix description for active sessions
-                if description == "active-session" and event.get('end_time') is not None:
-                    # Session ended but description wasn't updated - create proper description
-                    objects = self.db.get_event_objects(event_id)
-                    object_count = len(set(obj['object_name'] for obj in objects))
-                    description = f"event{event_id:05d}-{object_count}-objects"
-                
+                # Add to tree
                 self.events_tree.insert('', 'end', values=(
                     event_id, start_time, duration_str, description
                 ))
             
-            self.logger.info(f"Loaded {len(events)} events")
+            # Update status
+            filter_text = []
+            if start_date:
+                filter_text.append(f"From: {start_date}")
+            if end_date:
+                filter_text.append(f"To: {end_date}")
+            
+            status_text = f"Loaded {len(events)} events"
+            if filter_text:
+                status_text += f" ({', '.join(filter_text)})"
+            
+            self.status_var.set(status_text)
             
         except Exception as e:
             self.logger.error(f"Error loading events: {e}")
@@ -308,41 +346,39 @@ class EventJournalDialog:
             self.start_time_label.config(text=session['start_time'])
             self.duration_label.config(text=f"{session.get('duration', 0)} seconds")
             
-            # Load objects
+            # Load objects and photos (without filters initially)
             self._load_event_objects(event_id)
-            
-            # Load photos
             self._load_event_photos(event_id)
             
         except Exception as e:
             self.logger.error(f"Error loading event details: {e}")
     
-    def _load_event_objects(self, event_id: int) -> None:
-        """Load objects for selected event."""
+    def _load_event_objects(self, event_id: int, object_name: str = None, object_type: str = None) -> None:
+        """Load objects for selected event with optional filtering."""
         try:
             # Clear existing items
             for item in self.objects_tree.get_children():
                 self.objects_tree.delete(item)
             
-            # Get objects from database
-            objects = self.db.get_event_objects(event_id)
+            # Get objects from database with filters
+            objects = self.db.get_event_objects(event_id, object_name, object_type)
             
             # Add objects to tree
             for obj in objects:
                 timestamp = obj['timestamp']
-                object_name = obj['object_name']
-                object_type = obj.get('object_type', 'Person')
+                obj_name = obj['object_name']
+                obj_type = obj.get('object_type', 'Person')
                 confidence = f"{obj.get('confidence', 0):.2f}"
                 
                 self.objects_tree.insert('', 'end', values=(
-                    timestamp, object_name, object_type, confidence
+                    timestamp, obj_name, obj_type, confidence
                 ))
             
         except Exception as e:
             self.logger.error(f"Error loading event objects: {e}")
     
-    def _load_event_photos(self, event_id: int) -> None:
-        """Load photos for selected event."""
+    def _load_event_photos(self, event_id: int, object_name: str = None) -> None:
+        """Load photos for selected event with optional object name filtering."""
         try:
             # Clear existing photos
             for widget in self.photos_frame_inner.winfo_children():
@@ -350,8 +386,8 @@ class EventJournalDialog:
             
             self.photo_thumbnails.clear()
             
-            # Get photos from database
-            photos = self.db.get_event_photos(event_id)
+            # Get photos from database with object name filter
+            photos = self.db.get_event_photos(event_id, object_name)
             
             if not photos:
                 # Show no photos message
@@ -454,15 +490,82 @@ class EventJournalDialog:
     
     def _apply_filter(self) -> None:
         """Apply date filter to events."""
-        # This is a simplified filter implementation
-        # In a full implementation, you'd modify the database query
-        messagebox.showinfo("Filter", "Date filtering not yet implemented")
+        try:
+            # Validate date format
+            start_date = self.start_date_var.get().strip()
+            end_date = self.end_date_var.get().strip()
+            
+            # Basic date validation (YYYY-MM-DD format)
+            date_pattern = r'^\d{4}-\d{2}-\d{2}$'
+            
+            if start_date and not re.match(date_pattern, start_date):
+                messagebox.showerror("Invalid Date", "Start date must be in YYYY-MM-DD format")
+                return
+            
+            if end_date and not re.match(date_pattern, end_date):
+                messagebox.showerror("Invalid Date", "End date must be in YYYY-MM-DD format")
+                return
+            
+            # Apply filter by reloading events
+            self._load_events()
+            
+        except Exception as e:
+            self.logger.error(f"Error applying filter: {e}")
+            messagebox.showerror("Error", f"Failed to apply filter: {e}")
     
     def _clear_filter(self) -> None:
         """Clear date filter."""
         self.start_date_var.set("")
         self.end_date_var.set("")
         self._load_events()
+    
+    def _apply_object_filters(self) -> None:
+        """Apply object name and type filters to current event."""
+        try:
+            if not self.selected_event_id:
+                messagebox.showwarning("No Event Selected", "Please select an event first")
+                return
+            
+            # Get filter values
+            object_name = self.object_name_var.get().strip()
+            object_type = self.object_type_var.get().strip()
+            
+            # Apply filters by reloading photos and objects
+            self._load_event_objects(self.selected_event_id, object_name, object_type)
+            self._load_event_photos(self.selected_event_id, object_name)
+            
+            # Update status
+            filter_text = []
+            if object_name:
+                filter_text.append(f"Name: {object_name}")
+            if object_type:
+                filter_text.append(f"Type: {object_type}")
+            
+            status_text = "Applied object filters"
+            if filter_text:
+                status_text += f" ({', '.join(filter_text)})"
+            
+            self.status_var.set(status_text)
+            
+        except Exception as e:
+            self.logger.error(f"Error applying object filters: {e}")
+            messagebox.showerror("Error", f"Failed to apply object filters: {e}")
+    
+    def _clear_object_filters(self) -> None:
+        """Clear object name and type filters."""
+        try:
+            self.object_name_var.set("")
+            self.object_type_var.set("")
+            
+            # Reload photos and objects without filters
+            if self.selected_event_id:
+                self._load_event_photos(self.selected_event_id)
+            
+            self.status_var.set("Object filters cleared")
+            
+        except Exception as e:
+            self.logger.error(f"Error clearing object filters: {e}")
+            messagebox.showerror("Error", f"Failed to clear object filters: {e}")
     
     def _update_delay(self) -> None:
         """Update event inactivity delay."""

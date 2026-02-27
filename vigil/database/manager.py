@@ -509,15 +509,34 @@ class EventSessionsDatabase(DatabaseManager):
         result = self.execute_query('SELECT last_insert_rowid()')
         return result[0]['last_insert_rowid()']
     
-    def get_event_sessions(self, limit: int = 100) -> List[Dict[str, Any]]:
-        """Get all event sessions."""
+    def get_event_sessions(self, limit: int = 100, start_date: str = None, end_date: str = None) -> List[Dict[str, Any]]:
+        """Get event sessions with optional date filtering."""
         query = '''
             SELECT id, start_time, end_time, duration, description, created_at
             FROM event_sessions
+        '''
+        params = []
+        
+        # Add date filtering if provided
+        if start_date or end_date:
+            conditions = []
+            if start_date:
+                conditions.append("DATE(start_time) >= DATE(?)")
+                params.append(start_date)
+            if end_date:
+                conditions.append("DATE(start_time) <= DATE(?)")
+                params.append(end_date)
+            
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+        
+        query += '''
             ORDER BY start_time DESC
             LIMIT ?
         '''
-        results = self.execute_query(query, (limit,))
+        params.append(limit)
+        
+        results = self.execute_query(query, tuple(params))
         return [dict(row) for row in results]
     
     def get_event_session(self, session_id: int) -> Optional[Dict[str, Any]]:
@@ -529,26 +548,47 @@ class EventSessionsDatabase(DatabaseManager):
             return dict(results[0])
         return None
     
-    def get_event_photos(self, session_id: int) -> List[Dict[str, Any]]:
-        """Get all photos for an event session."""
+    def get_event_photos(self, session_id: int, object_name: str = None) -> List[Dict[str, Any]]:
+        """Get photos for an event session with optional object name filtering."""
         query = '''
             SELECT id, object_name, photo_path, timestamp, confidence
             FROM event_photos
             WHERE event_id = ?
-            ORDER BY timestamp
         '''
-        results = self.execute_query(query, (session_id,))
+        params = [session_id]
+        
+        # Add object name filter if provided
+        if object_name:
+            query += ' AND object_name LIKE ?'
+            params.append(f'%{object_name}%')
+        
+        query += ' ORDER BY timestamp'
+        
+        results = self.execute_query(query, tuple(params))
         return [dict(row) for row in results]
     
-    def get_event_objects(self, session_id: int) -> List[Dict[str, Any]]:
-        """Get all objects recognized in an event session."""
+    def get_event_objects(self, session_id: int, object_name: str = None, object_type: str = None) -> List[Dict[str, Any]]:
+        """Get objects recognized in an event session with optional filtering."""
         query = '''
             SELECT id, object_name, object_type, timestamp, confidence
             FROM event_objects
             WHERE event_id = ?
-            ORDER BY timestamp
         '''
-        results = self.execute_query(query, (session_id,))
+        params = [session_id]
+        
+        # Add object name filter if provided
+        if object_name:
+            query += ' AND object_name LIKE ?'
+            params.append(f'%{object_name}%')
+        
+        # Add object type filter if provided
+        if object_type:
+            query += ' AND object_type LIKE ?'
+            params.append(f'%{object_type}%')
+        
+        query += ' ORDER BY timestamp'
+        
+        results = self.execute_query(query, tuple(params))
         return [dict(row) for row in results]
     
     def delete_event_session(self, session_id: int) -> bool:
