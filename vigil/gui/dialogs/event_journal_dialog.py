@@ -40,6 +40,7 @@ class EventJournalDialog:
         self.current_photos = []
         self.photo_thumbnails = []
         self.status_var = tk.StringVar(value="Ready")
+        self.selected_photos = set()  # Track selected photos for dataset addition
         
         # Create UI
         self._create_widgets()
@@ -252,6 +253,8 @@ class EventJournalDialog:
         ttk.Button(button_frame, text="Refresh", command=self._load_events).pack(side=tk.LEFT, padx=(0, 5))
         self.video_button = ttk.Button(button_frame, text="Open Video", command=self._open_video, state="disabled")
         self.video_button.pack(side=tk.LEFT, padx=(0, 5))
+        self.add_to_dataset_button = ttk.Button(button_frame, text="Add to Dataset", command=self._add_to_dataset, state="disabled")
+        self.add_to_dataset_button.pack(side=tk.LEFT, padx=(0, 5))
         
         if self.main_window and authz_manager.has_permission(self.main_window.current_role, 'admin'):
             ttk.Button(button_frame, text="Delete Event", command=self._delete_event).pack(side=tk.LEFT, padx=(0, 5))
@@ -438,9 +441,16 @@ class EventJournalDialog:
             photo_frame = ttk.Frame(self.photos_frame_inner, relief=tk.RAISED, borderwidth=1)
             photo_frame.grid(row=row, column=col, padx=5, pady=5, sticky=(tk.W, tk.E, tk.N, tk.S))
             
-            # Photo label
+            # Photo label with click binding
             photo_label = ttk.Label(photo_frame, image=photo)
             photo_label.pack(pady=(5, 2))
+            photo_label.bind('<Button-1>', lambda e, path=photo_path, data=photo_data: self._on_photo_click(e, path, data))
+            
+            # Selection indicator (initially hidden)
+            selection_var = tk.BooleanVar(value=False)
+            selection_check = ttk.Checkbutton(photo_frame, variable=selection_var, 
+                                         command=lambda p=photo_path, v=selection_var: self._on_photo_selection(p, v))
+            selection_check.pack(pady=(0, 2))
             
             # Info label
             info_text = f"{photo_data['object_name']}\n{photo_data['timestamp']}"
@@ -708,6 +718,114 @@ class EventJournalDialog:
         
         # Disable video button
         self.video_button.config(state="disabled")
+        self.add_to_dataset_button.config(state="disabled")
+    
+    def _on_photo_click(self, event, photo_path: str, photo_data: Dict) -> None:
+        """Handle photo click for selection."""
+        # Toggle selection
+        if photo_path in self.selected_photos:
+            self.selected_photos.remove(photo_path)
+        else:
+            self.selected_photos.add(photo_path)
+        
+        # Update button state
+        self.add_to_dataset_button.config(state="normal" if self.selected_photos else "disabled")
+        
+        # Update status
+        self.status_var.set(f"Selected {len(self.selected_photos)} photo(s)")
+    
+    def _on_photo_selection(self, photo_path: str, selection_var: tk.BooleanVar) -> None:
+        """Handle photo selection via checkbox."""
+        if selection_var.get():
+            self.selected_photos.add(photo_path)
+        else:
+            self.selected_photos.discard(photo_path)
+        
+        # Update button state
+        self.add_to_dataset_button.config(state="normal" if self.selected_photos else "disabled")
+        
+        # Update status
+        self.status_var.set(f"Selected {len(self.selected_photos)} photo(s)")
+    
+    def _add_to_dataset(self) -> None:
+        """Add selected photos to dataset."""
+        if not self.selected_photos:
+            messagebox.showwarning("No Selection", "Please select photos to add to dataset.")
+            return
+        
+        try:
+            # Show person selection dialog
+            from vigil.gui.dialogs.person_selection_dialog import PersonSelectionDialog
+            from vigil.config.constants import get_data_dir
+            
+            dataset_path = os.path.join(get_data_dir(), 'dataset')
+            person_dialog = PersonSelectionDialog(self.dialog, dataset_path)
+            selected_person = person_dialog.show()
+            
+            if not selected_person:
+                return  # User cancelled
+            
+            # Add photos to dataset
+            from vigil.utils.dataset_manager import DatasetManager
+            dataset_manager = DatasetManager()
+            
+            success_count = 0
+            import time
+            for i, photo_path in enumerate(self.selected_photos):
+                if dataset_manager.add_training_image(dataset_path, selected_person, photo_path):
+                    success_count += 1
+                
+                # Small delay to ensure unique timestamps
+                if i < len(self.selected_photos) - 1:
+                    time.sleep(0.01)  # 10ms delay between images
+            
+            if success_count > 0:
+                messagebox.showinfo("Success", 
+                                 f"Added {success_count} photo(s) to {selected_person}'s dataset.")
+                
+                # Clear selection
+                self.selected_photos.clear()
+                self.add_to_dataset_button.config(state="disabled")
+                self.status_var.set(f"Added {success_count} photo(s) to dataset")
+                
+                # Ask if user wants to retrain model
+                result = messagebox.askyesno("Retrain Model", 
+                                           "Would you like to retrain the face recognition model with the new images?")
+                if result:
+                    self._trigger_training()
+            else:
+                messagebox.showerror("Error", "Failed to add photos to dataset.")
+                
+        except Exception as e:
+            self.logger.error(f"Error adding photos to dataset: {e}")
+            messagebox.showerror("Error", f"Failed to add photos to dataset: {e}")
+    
+    def _trigger_training(self) -> None:
+        """Trigger model training."""
+        try:
+            # Get training service from main window
+            if hasattr(self.main_window, 'training_service'):
+                training_service = self.main_window.training_service
+                
+                if training_service.is_training:
+                    messagebox.showwarning("Training in Progress", 
+                                       "Model training is already in progress.")
+                    return
+                
+                # Start training
+                success = training_service.start_training()
+                if success:
+                    self.status_var.set("Model training started...")
+                    messagebox.showinfo("Training Started", 
+                                     "Model training has started in the background.")
+                else:
+                    messagebox.showerror("Error", "Failed to start model training.")
+            else:
+                messagebox.showerror("Error", "Training service not available.")
+                
+        except Exception as e:
+            self.logger.error(f"Error triggering training: {e}")
+            messagebox.showerror("Error", f"Failed to start training: {e}")
     
     def _open_video(self) -> None:
         """Open video player for selected event."""

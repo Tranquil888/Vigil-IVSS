@@ -194,8 +194,11 @@ class DatasetManager:
             
             # Generate unique filename
             _, ext = os.path.splitext(image_path)
-            timestamp = int(time.time())
-            filename = f"{person_name}_{timestamp}{ext}"
+            
+            # Use original filename with timestamp to ensure uniqueness
+            original_name = os.path.splitext(os.path.basename(image_path))[0]
+            timestamp = int(time.time() * 1000)  # Use milliseconds for uniqueness
+            filename = f"{person_name}_{timestamp}_{original_name}{ext}"
             dest_path = os.path.join(person_path, filename)
             
             # Copy image
@@ -206,6 +209,43 @@ class DatasetManager:
         except Exception as e:
             self.logger.error(f"Error adding training image: {e}")
             return False
+    
+    def get_people_list(self, dataset_path: str) -> List[str]:
+        """
+        Get list of all people in the dataset.
+        
+        Args:
+            dataset_path: Path to the dataset directory
+            
+        Returns:
+            List of person names
+        """
+        try:
+            if not os.path.exists(dataset_path):
+                return []
+            
+            people = []
+            for item in os.listdir(dataset_path):
+                item_path = os.path.join(dataset_path, item)
+                
+                # Check if it's a directory and not hidden
+                if os.path.isdir(item_path) and not item.startswith('.'):
+                    # Check if directory contains image files
+                    has_images = False
+                    for file in os.listdir(item_path):
+                        if any(file.lower().endswith(ext) for ext in self.supported_formats):
+                            has_images = True
+                            break
+                    
+                    if has_images:
+                        people.append(item)
+            
+            people.sort()  # Sort alphabetically
+            return people
+            
+        except Exception as e:
+            self.logger.error(f"Error getting people list: {e}")
+            return []
     
     def remove_person_directory(self, dataset_path: str, person_name: str, archive_path: str = None) -> bool:
         """
