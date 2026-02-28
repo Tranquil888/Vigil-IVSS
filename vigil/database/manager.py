@@ -720,6 +720,27 @@ class EventSessionsDatabase(DatabaseManager):
             self.logger.error(f"Error getting available dates: {e}")
             return []
     
+    def get_available_event_dates(self) -> List[str]:
+        """
+        Get list of available event dates for filtering.
+        
+        Returns:
+            List of date strings in YYYY-MM-DD format, sorted descending
+        """
+        try:
+            query = '''
+                SELECT DISTINCT DATE(start_time) as date
+                FROM event_sessions
+                ORDER BY date DESC
+            '''
+            results = self.execute_query(query)
+            dates = [row[0] for row in results]
+            return dates
+            
+        except Exception as e:
+            self.logger.error(f"Error getting available event dates: {e}")
+            return []
+    
     def delete_photos(self, photo_ids: List[int]) -> bool:
         """
         Delete specific photos by their IDs.

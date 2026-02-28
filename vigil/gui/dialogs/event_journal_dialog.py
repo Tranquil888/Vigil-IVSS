@@ -44,6 +44,7 @@ class EventJournalDialog:
         
         # Create UI
         self._create_widgets()
+        self._load_available_dates()
         self._load_events()
         
         # Handle window closing
@@ -94,16 +95,16 @@ class EventJournalDialog:
         # Date filters
         ttk.Label(controls_frame, text="From:").pack(side=tk.LEFT, padx=(0, 5))
         self.start_date_var = tk.StringVar()
-        self.start_date_entry = ttk.Entry(controls_frame, textvariable=self.start_date_var, width=12)
-        self.start_date_entry.pack(side=tk.LEFT, padx=(0, 10))
+        self.start_date_combo = ttk.Combobox(controls_frame, textvariable=self.start_date_var, width=12)
+        self.start_date_combo.pack(side=tk.LEFT, padx=(0, 10))
         
         ttk.Label(controls_frame, text="To:").pack(side=tk.LEFT, padx=(0, 5))
         self.end_date_var = tk.StringVar()
-        self.end_date_entry = ttk.Entry(controls_frame, textvariable=self.end_date_var, width=12)
-        self.end_date_entry.pack(side=tk.LEFT, padx=(0, 10))
+        self.end_date_combo = ttk.Combobox(controls_frame, textvariable=self.end_date_var, width=12)
+        self.end_date_combo.pack(side=tk.LEFT, padx=(0, 10))
         
         # Filter buttons
-        ttk.Button(controls_frame, text="Filter", command=self._apply_filter).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(controls_frame, text="Filter", command=self._load_events).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(controls_frame, text="Clear", command=self._clear_filter).pack(side=tk.LEFT, padx=(0, 10))
         
         # Event delay setting (admin only) - moved to first row
@@ -281,11 +282,15 @@ class EventJournalDialog:
             start_date = self.start_date_var.get().strip()
             end_date = self.end_date_var.get().strip()
             
+            # Handle "All" option for dates
+            start_date = None if start_date == "All" else start_date
+            end_date = None if end_date == "All" else end_date
+            
             # Get events from database with date filtering
             events = self.db.get_event_sessions(
                 limit=200, 
-                start_date=start_date if start_date else None,
-                end_date=end_date if end_date else None
+                start_date=start_date,
+                end_date=end_date
             )
             
             # Add events to tree
@@ -313,18 +318,35 @@ class EventJournalDialog:
             if end_date:
                 filter_text.append(f"To: {end_date}")
             
-            status_text = f"Loaded {len(events)} events"
-            if filter_text:
-                status_text += f" ({', '.join(filter_text)})"
-            
-            self.status_var.set(status_text)
+            self.status_var.set(f"Loaded {len(events)} events")
             
         except Exception as e:
             self.logger.error(f"Error loading events: {e}")
             messagebox.showerror("Error", f"Failed to load events: {e}")
     
+    def _load_available_dates(self) -> None:
+        """Load available dates into dropdowns."""
+        try:
+            dates = self.db.get_available_event_dates()
+            
+            # Add "All" option at the beginning
+            all_dates = ["All"] + dates
+            
+            # Update dropdowns
+            self.start_date_combo['values'] = all_dates
+            self.end_date_combo['values'] = all_dates
+            
+            # Set default values
+            self.start_date_var.set("All")
+            self.end_date_var.set("All")
+            
+            self._load_event_details(self.selected_event_id)
+            
+        except Exception as e:
+            self.logger.error(f"Error loading available dates: {e}")
+    
     def _on_event_select(self, event) -> None:
-        """Handle event selection."""
+        """Handle event selection from treeview."""
         selection = self.events_tree.selection()
         if not selection:
             return
@@ -536,8 +558,8 @@ class EventJournalDialog:
     
     def _clear_filter(self) -> None:
         """Clear date filter."""
-        self.start_date_var.set("")
-        self.end_date_var.set("")
+        self.start_date_var.set("All")
+        self.end_date_var.set("All")
         self._load_events()
     
     def _apply_object_filters(self) -> None:
