@@ -9,6 +9,7 @@ SETTING_DB_PATH = "data/setting.db"
 AUTH_DB_PATH = "data/authentication.db"
 OBJECTS_DB_PATH = "data/objects.db"
 CAMERA_DB_PATH = "data/camerasetting.db"
+EVENTS_DB_PATH = "data/events.db"
 
 # Default settings
 DEFAULT_HOST = "127.0.0.1"
@@ -24,6 +25,9 @@ ROLE_OPERATOR = "operator"
 # Recognition algorithms
 ALGORITHM_CNN = "cnn"
 ALGORITHM_HOG = "hog"
+
+# Object types for filtering
+OBJECT_TYPES = ["Person", "Unknown", "Vehicle", "Animal", "Other"]
 
 # Video codecs
 CODEC_XVID = "XVID"

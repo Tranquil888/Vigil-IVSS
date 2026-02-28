@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from vigil.core.exceptions import DatabaseError
 from vigil.utils.logging_config import get_database_logger
 from vigil.config.constants import (
-    SETTING_DB_PATH, AUTH_DB_PATH, OBJECTS_DB_PATH, CAMERA_DB_PATH
+    SETTING_DB_PATH, AUTH_DB_PATH, OBJECTS_DB_PATH, CAMERA_DB_PATH, EVENTS_DB_PATH
 )
 
 
@@ -607,6 +607,41 @@ class EventSessionsDatabase(DatabaseManager):
         
         results = self.execute_query(query, tuple(params))
         return [dict(row) for row in results]
+    
+    def get_all_recognized_objects(self, object_name: str = None, object_type: str = None, 
+                                 limit: int = 500, offset: int = 0) -> List[Dict[str, Any]]:
+        """Get all recognized objects across all events with optional filtering."""
+        try:
+            query = '''
+                SELECT eo.id, eo.event_id, eo.object_name, eo.object_type, 
+                       eo.timestamp, eo.confidence, es.start_time as event_start_time,
+                       es.description as event_description
+                FROM event_objects eo
+                JOIN event_sessions es ON eo.event_id = es.id
+                WHERE 1=1
+            '''
+            params = []
+            
+            # Add object name filter if provided
+            if object_name:
+                query += ' AND eo.object_name LIKE ?'
+                params.append(f'%{object_name}%')
+            
+            # Add object type filter if provided
+            if object_type:
+                query += ' AND eo.object_type LIKE ?'
+                params.append(f'%{object_type}%')
+            
+            # Add ordering and pagination
+            query += ' ORDER BY eo.timestamp DESC LIMIT ? OFFSET ?'
+            params.extend([limit, offset])
+            
+            results = self.execute_query(query, tuple(params))
+            return [dict(row) for row in results]
+            
+        except Exception as e:
+            self.logger.error(f"Error getting all recognized objects: {e}")
+            return []
     
     def add_event_video(self, event_id: int, video_path: str, start_time: str, 
                        end_time: str, duration: int, file_size: int) -> int:

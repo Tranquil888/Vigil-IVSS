@@ -23,6 +23,7 @@ from vigil.recognition.training_service import training_service
 from vigil.events.logger import event_logger
 from vigil.events.session_manager import session_manager
 from vigil.config.settings import settings
+from vigil.database.manager import get_events_db
 
 
 class MainWindow:
@@ -56,7 +57,7 @@ class MainWindow:
     def _setup_window(self) -> None:
         """Setup the main window properties."""
         self.root.title("Vigil - Intelligent Video Surveillance System")
-        self.root.geometry("1200x800")
+        self.root.geometry("1400x900")
         self.root.minsize(800, 600)
         
         # Handle window closing
@@ -69,6 +70,9 @@ class MainWindow:
         
         # Create main toolbar
         self._create_toolbar()
+        
+        # Create filter controls
+        self._create_filter_controls()
         
         # Create status bar
         self._create_status_bar()
@@ -143,6 +147,35 @@ class MainWindow:
         ttk.Button(toolbar, text="Start Recording", command=self._start_recording).pack(side='left', padx=2)
         ttk.Button(toolbar, text="Stop Recording", command=self._stop_recording).pack(side='left', padx=2)
     
+    def _create_filter_controls(self) -> None:
+        """Create object filtering controls."""
+        from vigil.config.constants import OBJECT_TYPES
+        
+        filter_frame = ttk.Frame(self.root)
+        filter_frame.pack(side='top', fill='x', padx=5, pady=2)
+        
+        # Object name filter
+        ttk.Label(filter_frame, text="Object Name:").pack(side='left', padx=(0, 5))
+        self.object_name_var = tk.StringVar()
+        self.object_name_entry = ttk.Entry(filter_frame, textvariable=self.object_name_var, width=20)
+        self.object_name_entry.pack(side='left', padx=(0, 10))
+        
+        # Object type filter
+        ttk.Label(filter_frame, text="Object Type:").pack(side='left', padx=(0, 5))
+        self.object_type_var = tk.StringVar()
+        self.object_type_combo = ttk.Combobox(filter_frame, textvariable=self.object_type_var, 
+                                            values=["All"] + OBJECT_TYPES, width=15, state='readonly')
+        self.object_type_combo.set("All")
+        self.object_type_combo.pack(side='left', padx=(0, 10))
+        
+        # Filter buttons
+        ttk.Button(filter_frame, text="Apply Filters", command=self._apply_object_filters).pack(side='left', padx=(0, 5))
+        ttk.Button(filter_frame, text="Clear Filters", command=self._clear_object_filters).pack(side='left', padx=(0, 10))
+        
+        # Filter status
+        self.filter_status_label = ttk.Label(filter_frame, text="Showing all objects", font=("Arial", 9))
+        self.filter_status_label.pack(side='left', padx=(10, 0))
+    
     def _create_status_bar(self) -> None:
         """Create the status bar."""
         self.status_bar = ttk.Frame(self.root)
@@ -186,10 +219,68 @@ class MainWindow:
         self._refresh_objects_list()
     
     def _create_camera_tab(self) -> None:
-        """Create the camera monitoring tab."""
-        # Video display area
-        video_frame = ttk.LabelFrame(self.camera_frame, text="Video Feed")
-        video_frame.pack(fill='both', expand=True, padx=5, pady=5)
+        """Create the camera monitoring tab with new layout."""
+        # Main horizontal container
+        main_container = ttk.Frame(self.camera_frame)
+        main_container.pack(fill='both', expand=True, padx=5, pady=5)
+        main_container.columnconfigure(0, weight=2)  # Objects log (40%)
+        main_container.columnconfigure(1, weight=3)  # Video feed (60%)
+        main_container.rowconfigure(0, weight=1)
+        
+        # Left side: Recognized Objects Log
+        self._create_objects_log(main_container)
+        
+        # Right side: Video Feed
+        self._create_video_feed(main_container)
+        
+        # Bottom: Recognition controls
+        self._create_recognition_controls()
+    
+    def _create_objects_log(self, parent) -> None:
+        """Create the recognized objects log on the left side."""
+        objects_frame = ttk.LabelFrame(parent, text="Recognized Objects Log")
+        objects_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 5))
+        objects_frame.columnconfigure(0, weight=1)
+        objects_frame.rowconfigure(0, weight=1)
+        
+        # Create treeview for objects
+        object_columns = ('timestamp', 'object_name', 'object_type', 'confidence', 'event_id')
+        self.recognized_objects_tree = ttk.Treeview(objects_frame, columns=object_columns, show='headings')
+        
+        # Define headings
+        self.recognized_objects_tree.heading('timestamp', text='Time')
+        self.recognized_objects_tree.heading('object_name', text='Object Name')
+        self.recognized_objects_tree.heading('object_type', text='Type')
+        self.recognized_objects_tree.heading('confidence', text='Confidence')
+        self.recognized_objects_tree.heading('event_id', text='Event ID')
+        
+        # Configure column widths
+        self.recognized_objects_tree.column('timestamp', width=120)
+        self.recognized_objects_tree.column('object_name', width=120)
+        self.recognized_objects_tree.column('object_type', width=80)
+        self.recognized_objects_tree.column('confidence', width=80)
+        self.recognized_objects_tree.column('event_id', width=80)
+        
+        # Scrollbar for objects
+        objects_scrollbar = ttk.Scrollbar(objects_frame, orient=tk.VERTICAL, command=self.recognized_objects_tree.yview)
+        self.recognized_objects_tree.configure(yscrollcommand=objects_scrollbar.set)
+        
+        # Grid widgets
+        self.recognized_objects_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        objects_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        
+        # Initialize objects data
+        self._refresh_objects_log()
+        
+        # Start auto-refresh schedule
+        self.root.after(5000, self._schedule_objects_refresh)
+    
+    def _create_video_feed(self, parent) -> None:
+        """Create the video feed on the right side."""
+        video_frame = ttk.LabelFrame(parent, text="Video Feed")
+        video_frame.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(5, 0))
+        video_frame.columnconfigure(0, weight=1)
+        video_frame.rowconfigure(0, weight=1)
         
         # Create canvas for video display
         self.video_canvas = tk.Canvas(
@@ -197,8 +288,10 @@ class MainWindow:
             background='black',
             highlightthickness=0
         )
-        self.video_canvas.pack(fill='both', expand=True, padx=5, pady=5)
-        
+        self.video_canvas.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=5, pady=5)
+    
+    def _create_recognition_controls(self) -> None:
+        """Create recognition controls at the bottom."""
         # Camera controls
         controls_frame = ttk.Frame(self.camera_frame)
         controls_frame.pack(fill='x', padx=5, pady=5)
@@ -233,7 +326,7 @@ class MainWindow:
         )
         self.stop_recording_btn.pack(side='left', padx=2)
         
-        # Recognition controls and info
+        # Recognition info
         recognition_frame = ttk.LabelFrame(self.camera_frame, text="Face Recognition")
         recognition_frame.pack(fill='x', padx=5, pady=5)
         
@@ -1514,3 +1607,82 @@ class MainWindow:
             for item in self.events_tree.get_children():
                 self.events_tree.delete(item)
             self.status_label.config(text="Events cleared")
+    
+    def _refresh_objects_log(self) -> None:
+        """Refresh recognized objects log."""
+        try:
+            # Get database instance
+            db = get_events_db()
+            
+            # Get current filter values
+            object_name = self.object_name_var.get().strip() if hasattr(self, 'object_name_var') else None
+            object_type = self.object_type_var.get() if hasattr(self, 'object_type_var') else "All"
+            object_type = None if object_type == "All" else object_type
+            
+            # Get filtered objects
+            objects = db.get_all_recognized_objects(
+                object_name=object_name if object_name else None,
+                object_type=object_type,
+                limit=500
+            )
+            
+            # Clear existing items
+            for item in self.recognized_objects_tree.get_children():
+                self.recognized_objects_tree.delete(item)
+            
+            # Add objects to treeview
+            for obj in objects:
+                self.recognized_objects_tree.insert('', 'end', values=(
+                    obj['timestamp'],
+                    obj['object_name'],
+                    obj['object_type'],
+                    f"{obj['confidence']:.1f}%",
+                    obj['event_id']
+                ))
+            
+            # Update filter status
+            self._update_filter_status()
+            
+        except Exception as e:
+            self.logger.error(f"Error refreshing objects log: {e}")
+    
+    def _apply_object_filters(self) -> None:
+        """Apply object filters and refresh the log."""
+        self._refresh_objects_log()
+        self.status_label.config(text="Filters applied")
+    
+    def _clear_object_filters(self) -> None:
+        """Clear all object filters."""
+        if hasattr(self, 'object_name_var'):
+            self.object_name_var.set("")
+        if hasattr(self, 'object_type_var'):
+            self.object_type_var.set("All")
+        
+        self._refresh_objects_log()
+        self.status_label.config(text="Filters cleared")
+    
+    def _update_filter_status(self) -> None:
+        """Update the filter status label."""
+        if not hasattr(self, 'filter_status_label'):
+            return
+            
+        object_name = self.object_name_var.get().strip() if hasattr(self, 'object_name_var') else ""
+        object_type = self.object_type_var.get() if hasattr(self, 'object_type_var') else "All"
+        
+        if object_name and object_type != "All":
+            status = f"Filtering by name: '{object_name}', type: {object_type}"
+        elif object_name:
+            status = f"Filtering by name: '{object_name}'"
+        elif object_type != "All":
+            status = f"Filtering by type: {object_type}"
+        else:
+            status = "Showing all objects"
+        
+        self.filter_status_label.config(text=status)
+    
+    def _schedule_objects_refresh(self) -> None:
+        """Schedule periodic refresh of objects log."""
+        if hasattr(self, 'recognized_objects_tree'):
+            self._refresh_objects_log()
+            # Schedule next refresh in 5 seconds
+            self.root.after(5000, self._schedule_objects_refresh)
