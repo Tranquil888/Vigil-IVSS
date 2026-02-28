@@ -9,10 +9,12 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import os
 from typing import Dict, Any, Optional, Callable
+from PIL import Image, ImageTk
 
 from vigil.models.object import Object
 from vigil.services.object_service import object_service
 from vigil.utils.logging_config import get_ui_logger
+from vigil.auth.authorization import authz_manager
 
 logger = get_ui_logger()
 
@@ -20,16 +22,19 @@ logger = get_ui_logger()
 class BaseObjectDialog(tk.Toplevel):
     """Base class for object dialogs."""
     
-    def __init__(self, parent, title: str, geometry: str = "700x600"):
+    def __init__(self, parent, title: str, geometry: str = "700x600", current_role: str = None):
         super().__init__(parent)
         self.title(title)
         self.geometry(geometry)
-        self.resizable(False, False)
+        self.resizable(True, True)  # Make dialogs resizable
+        self.minsize(650, 600)  # Set minimum size
         self.transient(parent)
         self.grab_set()
         
         self.result = None
         self.object_data = {}
+        self.current_role = current_role
+        self.avatar_path = None  # Store current avatar path
         
         self._create_widgets()
         self._center_window()
@@ -40,6 +45,141 @@ class BaseObjectDialog(tk.Toplevel):
         x = (self.winfo_screenwidth() // 2) - (self.winfo_width() // 2)
         y = (self.winfo_screenheight() // 2) - (self.winfo_height() // 2)
         self.geometry(f"+{x}+{y}")
+    
+    def _get_avatar_path(self, avatar_filename: str) -> str:
+        """Get full path to avatar file."""
+        base_path = os.path.join(os.getcwd(), "data", "photo", "objects")
+        return os.path.join(base_path, avatar_filename)
+    
+    def _load_avatar_image(self, avatar_filename: str = None):
+        """Load and display avatar image."""
+        if avatar_filename:
+            avatar_path = self._get_avatar_path(avatar_filename)
+        else:
+            # Use default avatar based on category
+            category = getattr(self, 'category_var', None)
+            if category:
+                category_num = category.get().split('-')[0] if category.get() else '4'
+            else:
+                category_num = '4'
+            
+            default_avatars = {
+                '1': 'no_avatar_green.jpg',
+                '2': 'no_avatar_grey.jpg', 
+                '3': 'no_avatar_blue.jpg',
+                '4': 'no_avatar_red.jpg'
+            }
+            avatar_filename = default_avatars.get(category_num, 'no_avatar_red.jpg')
+            avatar_path = self._get_avatar_path(avatar_filename)
+        
+        try:
+            if os.path.exists(avatar_path):
+                image = Image.open(avatar_path)
+                image = image.resize((120, 120), Image.Resampling.LANCZOS)
+                photo = ImageTk.PhotoImage(image)
+                
+                if hasattr(self, 'avatar_label'):
+                    self.avatar_label.configure(image=photo, text="")
+                    self.avatar_label.image = photo  # Keep reference
+                
+                self.avatar_path = avatar_path
+                return avatar_filename
+            else:
+                # Show placeholder if file doesn't exist
+                if hasattr(self, 'avatar_label'):
+                    self.avatar_label.configure(image="", text="No Avatar")
+                
+        except Exception as e:
+            logger.error(f"Error loading avatar {avatar_path}: {e}")
+            # Show error placeholder
+            if hasattr(self, 'avatar_label'):
+                self.avatar_label.configure(image="", text="Error")
+        
+        return None
+    
+    def _browse_avatar(self):
+        """Browse for avatar image file."""
+        if not authz_manager.can_manage_objects(self.current_role):
+            messagebox.showerror("Access Denied", "You don't have permission to manage objects")
+            return
+        
+        file_types = [
+            ("Image files", "*.jpg *.jpeg *.png *.bmp *.gif"),
+            ("JPEG files", "*.jpg *.jpeg"),
+            ("PNG files", "*.png"),
+            ("All files", "*.*")
+        ]
+        
+        filename = filedialog.askopenfilename(
+            title="Select Avatar Image",
+            filetypes=file_types
+        )
+        
+        if filename:
+            self._process_avatar_file(filename)
+    
+    def _process_avatar_file(self, filepath: str):
+        """Process uploaded avatar file."""
+        try:
+            # Validate file
+            if not os.path.exists(filepath):
+                messagebox.showerror("Error", "File not found")
+                return
+            
+            # Check file size (max 5MB)
+            file_size = os.path.getsize(filepath)
+            if file_size > 5 * 1024 * 1024:  # 5MB
+                messagebox.showerror("Error", "File size too large (max 5MB)")
+                return
+            
+            # Try to open as image
+            image = Image.open(filepath)
+            
+            # Convert to RGB if necessary
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
+            
+            # Resize to reasonable size (max 300x300)
+            image.thumbnail((300, 300), Image.Resampling.LANCZOS)
+            
+            # Generate unique filename
+            import uuid
+            ext = os.path.splitext(filepath)[1].lower()
+            if ext not in ['.jpg', '.jpeg']:
+                ext = '.jpg'
+            
+            unique_filename = f"avatar_{uuid.uuid4().hex[:8]}{ext}"
+            save_path = self._get_avatar_path(unique_filename)
+            
+            # Save the image
+            image.save(save_path, "JPEG", quality=85)
+            
+            # Update display
+            self._load_avatar_image(unique_filename)
+            
+            # Enable remove button for custom avatars
+            if hasattr(self, 'remove_btn'):
+                self.remove_btn.configure(state='normal')
+            
+            logger.info(f"Avatar saved: {save_path}")
+            
+        except Exception as e:
+            logger.error(f"Error processing avatar: {e}")
+            messagebox.showerror("Error", f"Failed to process avatar: {str(e)}")
+    
+    def _remove_avatar(self):
+        """Remove custom avatar and revert to default."""
+        if not authz_manager.can_manage_objects(self.current_role):
+            messagebox.showerror("Access Denied", "You don't have permission to manage objects")
+            return
+        
+        # Revert to default avatar
+        self._load_avatar_image()
+        self.avatar_path = None
+        
+        # Disable remove button for default avatars
+        if hasattr(self, 'remove_btn'):
+            self.remove_btn.configure(state='disabled')
     
     def _create_widgets(self):
         """Create dialog widgets - to be overridden."""
@@ -53,8 +193,8 @@ class BaseObjectDialog(tk.Toplevel):
 class AddObjectDialog(BaseObjectDialog):
     """Dialog for adding a new object."""
     
-    def __init__(self, parent):
-        super().__init__(parent, "Add Object")
+    def __init__(self, parent, current_role: str = None):
+        super().__init__(parent, "Add Object", "750x750", current_role=current_role)
     
     def _create_widgets(self):
         """Create widgets for add object dialog."""
@@ -86,6 +226,31 @@ class AddObjectDialog(BaseObjectDialog):
         
         personal_frame.columnconfigure(1, weight=1)
         
+        # Avatar Section (Admin only)
+        if authz_manager.can_manage_objects(self.current_role):
+            avatar_frame = ttk.LabelFrame(main_frame, text="Avatar", padding="10")
+            avatar_frame.pack(fill='x', pady=(0, 10))
+            
+            # Avatar display and controls
+            avatar_container = ttk.Frame(avatar_frame)
+            avatar_container.pack(fill='x')
+            
+            # Avatar preview
+            self.avatar_label = ttk.Label(avatar_container, text="No Avatar", relief="solid", borderwidth=1)
+            self.avatar_label.grid(row=0, column=0, padx=(0, 10), pady=5)
+            
+            # Avatar controls
+            controls_frame = ttk.Frame(avatar_container)
+            controls_frame.grid(row=0, column=1, sticky='ew', pady=5)
+            controls_frame.columnconfigure(0, weight=1)
+            
+            ttk.Button(controls_frame, text="Browse", command=self._browse_avatar).pack(side='left', padx=(0, 5))
+            self.remove_btn = ttk.Button(controls_frame, text="Remove", command=self._remove_avatar, state='disabled')
+            self.remove_btn.pack(side='left', padx=(0, 5))
+            
+            # Load initial avatar
+            self._load_avatar_image()
+        
         # Category
         category_frame = ttk.LabelFrame(main_frame, text="Category", padding="10")
         category_frame.pack(fill='x', pady=(0, 10))
@@ -105,6 +270,10 @@ class AddObjectDialog(BaseObjectDialog):
         ttk.Label(colors_frame, text=colors_text, font=("Arial", 9)).pack()
         
         category_frame.columnconfigure(1, weight=1)
+        
+        # Bind category change to update default avatar (only if avatar section exists)
+        if hasattr(self, 'avatar_label'):
+            self.category_var.trace('w', lambda *args: self._load_avatar_image())
         
         # Address Information
         address_frame = ttk.LabelFrame(main_frame, text="Address Information", padding="10")
@@ -163,6 +332,20 @@ class AddObjectDialog(BaseObjectDialog):
                 'ob_komments': self.comments_text.get("1.0", tk.END).strip()
             }
             
+            # Get avatar filename if custom avatar was uploaded
+            if self.avatar_path and hasattr(self, 'avatar_label'):
+                # Extract filename from full path
+                avatar_filename = os.path.basename(self.avatar_path)
+                # Check if it's a custom avatar (not default)
+                default_avatars = ['no_avatar_green.jpg', 'no_avatar_grey.jpg', 'no_avatar_blue.jpg', 'no_avatar_red.jpg']
+                if avatar_filename not in default_avatars:
+                    object_data['foto'] = avatar_filename
+                    logger.info(f"Setting custom avatar for new object: {avatar_filename}")
+                else:
+                    logger.info(f"Using default avatar: {avatar_filename}")
+            else:
+                logger.info("No custom avatar path found, will use default")
+            
             # Create object and validate
             obj = Object(object_data)
             
@@ -184,10 +367,10 @@ class AddObjectDialog(BaseObjectDialog):
 class EditObjectDialog(BaseObjectDialog):
     """Dialog for editing an existing object."""
     
-    def __init__(self, parent, modelfolder: str):
+    def __init__(self, parent, modelfolder: str, current_role: str = None):
         self.modelfolder = modelfolder
         self.original_object = object_service.get_object_by_folder(modelfolder)
-        super().__init__(parent, f"Edit Object - {self.original_object.get_full_name() if self.original_object else 'Unknown'}", "700x700")
+        super().__init__(parent, f"Edit Object - {self.original_object.get_full_name() if self.original_object else 'Unknown'}", "750x820", current_role=current_role)
     
     def _create_widgets(self):
         """Create widgets for edit object dialog."""
@@ -224,6 +407,32 @@ class EditObjectDialog(BaseObjectDialog):
         
         personal_frame.columnconfigure(1, weight=1)
         
+        # Avatar Section (Admin only)
+        if authz_manager.can_manage_objects(self.current_role):
+            avatar_frame = ttk.LabelFrame(main_frame, text="Avatar", padding="10")
+            avatar_frame.pack(fill='x', pady=(0, 10))
+            
+            # Avatar display and controls
+            avatar_container = ttk.Frame(avatar_frame)
+            avatar_container.pack(fill='x')
+            
+            # Avatar preview
+            self.avatar_label = ttk.Label(avatar_container, text="No Avatar", relief="solid", borderwidth=1)
+            self.avatar_label.grid(row=0, column=0, padx=(0, 10), pady=5)
+            
+            # Avatar controls
+            controls_frame = ttk.Frame(avatar_container)
+            controls_frame.grid(row=0, column=1, sticky='ew', pady=5)
+            controls_frame.columnconfigure(0, weight=1)
+            
+            ttk.Button(controls_frame, text="Browse", command=self._browse_avatar).pack(side='left', padx=(0, 5))
+            self.remove_btn = ttk.Button(controls_frame, text="Remove", command=self._remove_avatar)
+            self.remove_btn.pack(side='left', padx=(0, 5))
+            
+            # Load existing avatar
+            existing_avatar = self.original_object.foto if self.original_object else None
+            self._load_avatar_image(existing_avatar)
+        
         # Category
         category_frame = ttk.LabelFrame(main_frame, text="Category", padding="10")
         category_frame.pack(fill='x', pady=(0, 10))
@@ -244,6 +453,10 @@ class EditObjectDialog(BaseObjectDialog):
         ttk.Label(colors_frame, text=colors_text, font=("Arial", 9)).pack()
         
         category_frame.columnconfigure(1, weight=1)
+        
+        # Bind category change to update default avatar (only if avatar section exists)
+        if hasattr(self, 'avatar_label'):
+            self.category_var.trace('w', lambda *args: self._load_avatar_image())
         
         # Address Information
         address_frame = ttk.LabelFrame(main_frame, text="Address Information", padding="10")
@@ -309,6 +522,20 @@ class EditObjectDialog(BaseObjectDialog):
                 'floornumb': self.floor_var.get().strip() or "0",
                 'ob_komments': self.comments_text.get("1.0", tk.END).strip()
             }
+            
+            # Get avatar filename if custom avatar was uploaded
+            if self.avatar_path and hasattr(self, 'avatar_label'):
+                # Extract filename from full path
+                avatar_filename = os.path.basename(self.avatar_path)
+                # Check if it's a custom avatar (not default)
+                default_avatars = ['no_avatar_green.jpg', 'no_avatar_grey.jpg', 'no_avatar_blue.jpg', 'no_avatar_red.jpg']
+                if avatar_filename not in default_avatars:
+                    object_data['foto'] = avatar_filename
+                    logger.info(f"Setting custom avatar for edited object: {avatar_filename}")
+                else:
+                    logger.info(f"Using default avatar: {avatar_filename}")
+            else:
+                logger.info("No custom avatar path found for edit, keeping existing")
             
             # Create object and validate
             obj = Object(object_data)

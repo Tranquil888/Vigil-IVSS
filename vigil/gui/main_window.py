@@ -521,7 +521,7 @@ class MainWindow:
     def _add_object(self) -> None:
         """Add a new object."""
         try:
-            dialog = AddObjectDialog(self.root)
+            dialog = AddObjectDialog(self.root, self.current_role)
             self.root.wait_window(dialog)
             
             if dialog.result:
@@ -548,7 +548,7 @@ class MainWindow:
                 messagebox.showwarning("Invalid Selection", "Cannot edit this object")
                 return
             
-            dialog = EditObjectDialog(self.root, model_folder)
+            dialog = EditObjectDialog(self.root, model_folder, self.current_role)
             self.root.wait_window(dialog)
             
             if dialog.result:

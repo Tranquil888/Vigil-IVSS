@@ -56,8 +56,9 @@ class ObjectService:
             next_number = self._get_next_object_number()
             obj.modelfolder = obj.generate_model_folder(next_number)
             
-            # Set avatar based on category
-            obj.foto = obj.get_avatar_filename()
+            # Set avatar based on category only if no custom avatar is provided
+            if not obj.foto or obj.foto == "no_avatar_red.jpg":
+                obj.foto = obj.get_avatar_filename()
             
             # Add to database
             success, message = self.objects_manager.add_object(obj.to_dict())
@@ -81,8 +82,9 @@ class ObjectService:
             if not is_valid:
                 return False, error_message
             
-            # Update avatar if category changed
-            obj.foto = obj.get_avatar_filename()
+            # Update avatar only if no custom avatar is provided or if it was a default avatar
+            if not obj.foto or obj.foto in ['no_avatar_green.jpg', 'no_avatar_grey.jpg', 'no_avatar_blue.jpg', 'no_avatar_red.jpg']:
+                obj.foto = obj.get_avatar_filename()
             
             # Update in database
             success, message = self.objects_manager.update_object(modelfolder, obj.to_dict())
