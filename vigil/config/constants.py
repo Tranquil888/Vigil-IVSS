@@ -27,7 +27,7 @@ ALGORITHM_CNN = "cnn"
 ALGORITHM_HOG = "hog"
 
 # Object types for filtering
-OBJECT_TYPES = ["Person", "Unknown", "Vehicle", "Animal", "Other"]
+OBJECT_TYPES = ["Resident", "Staff", "Visitor", "Unknown"]
 
 # Video codecs
 CODEC_XVID = "XVID"

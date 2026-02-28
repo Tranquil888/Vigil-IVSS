@@ -11,6 +11,7 @@ import re
 from typing import Dict, Any, List, Optional
 from vigil.database.manager import get_events_db
 from vigil.utils.logging_config import get_ui_logger
+from vigil.config.constants import OBJECT_TYPES
 from vigil.auth.authorization import authz_manager
 
 
@@ -127,7 +128,7 @@ class EventJournalDialog:
         ttk.Label(object_frame, text="Object Type:").pack(side=tk.LEFT, padx=(10, 5))
         self.object_type_var = tk.StringVar()
         self.object_type_combo = ttk.Combobox(object_frame, textvariable=self.object_type_var, width=12)
-        self.object_type_combo['values'] = ['Person', 'Unknown', 'Vehicle', 'Animal', 'Other']
+        self.object_type_combo['values'] = OBJECT_TYPES
         self.object_type_combo.pack(side=tk.LEFT, padx=(0, 10))
         
         ttk.Button(object_frame, text="Apply Filters", command=self._apply_object_filters).pack(side=tk.LEFT, padx=(10, 5))
@@ -403,7 +404,7 @@ class EventJournalDialog:
             for obj in objects:
                 timestamp = obj['timestamp']
                 obj_name = obj['object_name']
-                obj_type = obj.get('object_type', 'Person')
+                obj_type = obj.get('object_type', 'Unknown')
                 confidence = f"{obj.get('confidence', 0):.2f}"
                 
                 self.objects_tree.insert('', 'end', values=(
@@ -703,7 +704,7 @@ class EventJournalDialog:
                 for obj in objects:
                     f.write(f"Time: {obj['timestamp']}\n")
                     f.write(f"Name: {obj['object_name']}\n")
-                    f.write(f"Type: {obj.get('object_type', 'Person')}\n")
+                    f.write(f"Type: {obj.get('object_type', 'Unknown')}\n")
                     f.write(f"Confidence: {obj.get('confidence', 0):.2f}\n")
                     f.write("-" * 10 + "\n")
                 

@@ -247,7 +247,7 @@ class EventSessionManager:
                 self._end_current_session()
     
     def add_recognition_event(self, object_name: str, confidence: float, 
-                           frame, face_location, object_type: str = "Person") -> bool:
+                           frame, face_location, object_type: str = "Unknown") -> bool:
         """
         Add a recognition event to the current session.
         

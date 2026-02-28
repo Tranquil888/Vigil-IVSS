@@ -23,7 +23,7 @@ from vigil.recognition.training_service import training_service
 from vigil.events.logger import event_logger
 from vigil.events.session_manager import session_manager
 from vigil.config.settings import settings
-from vigil.database.manager import get_events_db
+from vigil.database.manager import get_events_db, get_objects_db
 
 
 class MainWindow:
@@ -1319,9 +1319,10 @@ class MainWindow:
                                 self.last_recognition_time[face_name] = float(time.time())
                                 
                                 # Log recognition event to session manager
+                                object_type = self._get_object_type_for_name(face_name)
                                 session_manager.add_recognition_event(
                                     face_name, confidence, frame, 
-                                    face['location'], 'Person'
+                                    face['location'], object_type
                                 )
                                 
                                 # Log to traditional event logger
@@ -1636,7 +1637,7 @@ class MainWindow:
                     obj['timestamp'],
                     obj['object_name'],
                     obj['object_type'],
-                    f"{obj['confidence']:.1f}%",
+                    f"{obj['confidence']:.2f}",
                     obj['event_id']
                 ))
             
@@ -1686,3 +1687,76 @@ class MainWindow:
             self._refresh_objects_log()
             # Schedule next refresh in 5 seconds
             self.root.after(5000, self._schedule_objects_refresh)
+    
+    def _get_object_type_for_name(self, object_name: str) -> str:
+        """Get the proper object type for a recognized object name."""
+        if object_name == 'Unknown':
+            return 'Unknown'
+        
+        try:
+            objects_db = get_objects_db()
+            # Try to find object by various name formats
+            obj = None
+            
+            # Try matching by modelfolder pattern first (most reliable)
+            all_objects = objects_db.get_all_objects()
+            for db_obj in all_objects:
+                # Create full name from first_name and last_name
+                first_name = db_obj.get('first_name', '')
+                last_name = db_obj.get('last_name', '')
+                full_name = f"{last_name} {first_name}".strip()
+                
+                # Check if object_name contains the database object's name parts
+                if full_name and full_name in object_name:
+                    obj = db_obj
+                    break
+                # Also check individual name parts
+                if first_name and first_name in object_name:
+                    obj = db_obj
+                    break
+                if last_name and last_name in object_name:
+                    obj = db_obj
+                    break
+                # Also check modelfolder
+                modelfolder = db_obj.get('modelfolder', '')
+                if modelfolder and modelfolder in object_name:
+                    obj = db_obj
+                    break
+            
+            if obj:
+                # Map category number to object type
+                category = obj.get('category', '4')
+                category_mapping = {
+                    '1': 'Resident',
+                    '2': 'Staff', 
+                    '3': 'Visitor',
+                    '4': 'Unknown'
+                }
+                object_type = category_mapping.get(category, 'Unknown')
+                self.logger.debug(f"Mapped {object_name} -> {object_type} (category: {category})")
+                return object_type
+            else:
+                # Try to extract category from face name pattern (e.g., "10009 1 Sergey")
+                # Pattern: [number] [category] [name]
+                try:
+                    parts = object_name.split()
+                    if len(parts) >= 2 and parts[1].isdigit():
+                        category_from_name = parts[1]
+                        category_mapping = {
+                            '1': 'Resident',
+                            '2': 'Staff', 
+                            '3': 'Visitor',
+                            '4': 'Unknown'
+                        }
+                        object_type = category_mapping.get(category_from_name, 'Unknown')
+                        self.logger.info(f"Extracted type from face name: {object_name} -> {object_type} (category: {category_from_name})")
+                        return object_type
+                except (IndexError, ValueError):
+                    pass
+                
+                self.logger.warning(f"Could not find database object or extract type from name: {object_name}")
+                # Default to 'Unknown' if no database match found
+                return 'Unknown'
+        except Exception as e:
+            self.logger.error(f"Error getting object type for {object_name}: {e}")
+            return 'Unknown'
