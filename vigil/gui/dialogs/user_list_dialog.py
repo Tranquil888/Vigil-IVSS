@@ -3,7 +3,7 @@ User list dialog for Vigil surveillance system.
 """
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 from typing import List, Dict, Any
 from vigil.auth.authentication import auth_manager
 from vigil.utils.logging_config import get_auth_logger
@@ -93,6 +93,9 @@ class UserListDialog:
         scrollbar = ttk.Scrollbar(tree_frame, orient='vertical', command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
         
+        # Bind selection event
+        self.tree.bind('<<TreeviewSelect>>', self._on_selection_change)
+        
         # Pack treeview and scrollbar
         self.tree.pack(side='left', fill='both', expand=True)
         scrollbar.pack(side='right', fill='y')
@@ -108,6 +111,15 @@ class UserListDialog:
             width=12
         )
         refresh_button.pack(side='left', padx=5)
+        
+        # Delete User button (admin only)
+        self.delete_button = ttk.Button(
+            buttons_frame,
+            text="Delete User",
+            command=self._delete_user,
+            width=12
+        )
+        self.delete_button.pack(side='left', padx=5)
         
         close_button = ttk.Button(
             buttons_frame,
@@ -187,10 +199,82 @@ class UserListDialog:
         user_count = len(users)
         if self.current_role == 'admin':
             self.status_label.config(text=f"Showing all {user_count} users")
+            # Enable delete button for admins
+            self.delete_button.config(state='normal')
         else:
             self.status_label.config(text=f"Showing {user_count} operators (admins hidden)")
+            # Disable delete button for operators
+            self.delete_button.config(state='disabled')
+        
+        # Initially disable delete button until user is selected
+        if not self.tree.selection():
+            self.delete_button.config(state='disabled' if self.current_role == 'admin' else 'disabled')
+    
+    def _delete_user(self) -> None:
+        """Delete selected user (admin only)."""
+        try:
+            # Get selected user
+            selected = self.tree.selection()
+            if not selected:
+                messagebox.showwarning("No Selection", "Please select a user to delete")
+                return
+            
+            # Get user data from treeview
+            item = self.tree.item(selected[0])
+            username = item['values'][0]
+            role = item['values'][1]
+            
+            # Safety checks
+            if role == 'admin':
+                messagebox.showerror("Error", "Cannot delete administrator accounts")
+                return
+            
+            # Confirm deletion
+            result = messagebox.askyesno(
+                "Confirm Deletion",
+                f"Are you sure you want to delete user '{username}'?\n\nThis action cannot be undone."
+            )
+            
+            if not result:
+                return
+            
+            # Delete user
+            success, message = auth_manager.delete_user(username)
+            
+            if success:
+                self.logger.info(f"User '{username}' deleted by admin '{self.current_role}'")
+                messagebox.showinfo("Success", f"User '{username}' deleted successfully")
+                # Refresh user list
+                self._load_users()
+            else:
+                messagebox.showerror("Error", f"Failed to delete user: {message}")
+                
+        except Exception as e:
+            self.logger.error(f"Error deleting user: {e}")
+            messagebox.showerror("Error", f"Failed to delete user: {e}")
     
     def _close(self) -> None:
         """Close the dialog."""
         self.logger.info(f"User list dialog closed by {self.current_role}")
         self.window.destroy()
+    
+    def _on_selection_change(self, event) -> None:
+        """Handle treeview selection change events."""
+        try:
+            selected = self.tree.selection()
+            has_selection = len(selected) > 0
+            
+            if self.current_role == 'admin' and has_selection:
+                # Check if selected user is not an admin
+                item = self.tree.item(selected[0])
+                role = item['values'][1]
+                if role == 'admin':
+                    self.delete_button.config(state='disabled')
+                else:
+                    self.delete_button.config(state='normal')
+            else:
+                self.delete_button.config(state='disabled')
+                
+        except Exception as e:
+            self.logger.error(f"Error handling selection change: {e}")
+            self.delete_button.config(state='disabled')

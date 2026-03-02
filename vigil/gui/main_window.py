@@ -101,6 +101,8 @@ class MainWindow:
         menubar.add_cascade(label="Users", menu=self.users_menu)
         self.users_menu.add_command(label="Create User", command=self._create_user)
         self.users_menu.add_command(label="User List", command=self._user_list)
+        self.users_menu.add_separator()
+        self.users_menu.add_command(label="Change User", command=self._change_user)
         
         # Objects menu
         objects_menu = tk.Menu(menubar, tearoff=0)
@@ -710,6 +712,7 @@ class MainWindow:
             # Disable all menus when not authenticated
             self.users_menu.entryconfig("Create User", state='disabled')
             self.users_menu.entryconfig("User List", state='disabled')
+            self.users_menu.entryconfig("Change User", state='disabled')
             return
         
         # Enable/disable based on permissions
@@ -718,6 +721,7 @@ class MainWindow:
         
         self.users_menu.entryconfig("Create User", state='normal' if can_create_users else 'disabled')
         self.users_menu.entryconfig("User List", state='normal' if can_view_users else 'disabled')
+        self.users_menu.entryconfig("Change User", state='normal')  # Always enabled when authenticated
     
     def _on_closing(self) -> None:
         """Handle window closing event."""
@@ -756,6 +760,42 @@ class MainWindow:
         from vigil.gui.dialogs.user_list_dialog import UserListDialog
         dialog = UserListDialog(self.root, self.current_role)
         dialog.show()
+    
+    def _change_user(self) -> None:
+        """Handle user change (logout and re-authentication)."""
+        try:
+            # Stop camera if running
+            if self.is_camera_running:
+                video_capture.stop_capture()
+                self.is_camera_running = False
+                self.logger.info("Camera stopped for user change")
+            
+            # Stop recording if active
+            if self.is_recording:
+                self._stop_recording()
+            
+            # Stop streaming if active
+            if self.is_streaming:
+                self._stop_streaming()
+            
+            # Clear current user credentials
+            self.logger.info(f"User '{self.current_user}' logging out")
+            self.current_user = None
+            self.current_role = None
+            
+            # Update UI to logged out state
+            self.user_label.config(text="Not logged in")
+            self.status_label.config(text="Please authenticate to use the system")
+            
+            # Update menu permissions
+            self._update_menu_permissions()
+            
+            # Show authentication dialog for re-login
+            self._authenticate_user()
+            
+        except Exception as e:
+            self.logger.error(f"Error during user change: {e}")
+            messagebox.showerror("Error", f"Failed to change user: {e}")
     
     def _add_object(self) -> None:
         """Add a new object."""
