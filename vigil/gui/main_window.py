@@ -48,6 +48,12 @@ class MainWindow:
         self._current_frame_photo = None
         self._last_frame_time = None  # Initialize FPS tracking
         
+        # Avatar rectangles for recent recognitions
+        self.recent_avatars = []  # Circular buffer for recent avatar data
+        self.avatar_labels = []   # List of avatar label widgets
+        self.max_recent_avatars = 5
+        self.avatar_index = 0     # Current index for circular buffer
+        
         self._setup_window()
         self._create_widgets()
         
@@ -384,17 +390,25 @@ class MainWindow:
     
     def _create_events_tab(self) -> None:
         """Create the events monitoring tab."""
-        # Events list
-        events_frame = ttk.LabelFrame(self.events_frame, text="Event Log")
-        events_frame.pack(fill='both', expand=True, padx=5, pady=5)
+        # Main container for events tab
+        main_container = ttk.Frame(self.events_frame)
+        main_container.pack(fill='both', expand=True, padx=5, pady=5)
         
-        # Create treeview for events
+        # Top section - Event log and avatars side by side
+        top_section = ttk.Frame(main_container)
+        top_section.pack(fill='both', expand=True)
+        
+        # Left side - Event log (70% width)
+        events_frame = ttk.LabelFrame(top_section, text="Event Log")
+        events_frame.pack(side='left', fill='both', expand=True, padx=(0, 5))
+        
+        # Create treeview for events (reduced height)
         columns = ("Time", "Event", "Object", "Confidence")
-        self.events_tree = ttk.Treeview(events_frame, columns=columns, show='headings', height=15)
+        self.events_tree = ttk.Treeview(events_frame, columns=columns, show='headings', height=12)
         
         for col in columns:
             self.events_tree.heading(col, text=col)
-            self.events_tree.column(col, width=150)
+            self.events_tree.column(col, width=120)
         
         # Scrollbar
         scrollbar = ttk.Scrollbar(events_frame, orient='vertical', command=self.events_tree.yview)
@@ -403,15 +417,240 @@ class MainWindow:
         self.events_tree.pack(side='left', fill='both', expand=True)
         scrollbar.pack(side='right', fill='y')
         
-        # Events controls
-        events_controls = ttk.Frame(self.events_frame)
-        events_controls.pack(fill='x', padx=5, pady=5)
+        # Right side - Recent Avatars (30% width, fixed size)
+        avatars_frame = ttk.LabelFrame(top_section, text="Recent Recognitions")
+        avatars_frame.pack(side='right', fill='y', padx=(5, 0))
+        
+        # Create a scrollable frame for avatars with fixed width
+        avatar_canvas = tk.Canvas(avatars_frame, height=300, width=150)
+        avatar_scrollbar = ttk.Scrollbar(avatars_frame, orient="vertical", command=avatar_canvas.yview)
+        avatar_scrollable_frame = ttk.Frame(avatar_canvas)
+        
+        avatar_canvas.configure(yscrollcommand=avatar_scrollbar.set)
+        avatar_canvas_frame = avatar_canvas.create_window((0, 0), window=avatar_scrollable_frame, anchor="nw", width=150)
+        
+        avatar_scrollable_frame.bind(
+            "<Configure>",
+            lambda e: avatar_canvas.configure(scrollregion=avatar_canvas.bbox("all"))
+        )
+        
+        self._create_avatar_rectangles(avatar_scrollable_frame)
+        
+        avatar_canvas.pack(side="left", fill="both", expand=False)
+        avatar_scrollbar.pack(side="right", fill="y")
+        
+        # Bottom section - Events controls (always visible)
+        events_controls = ttk.Frame(main_container)
+        events_controls.pack(side='bottom', fill='x', pady=(5, 0), anchor='w')
         
         ttk.Button(events_controls, text="View Events", command=self._view_events).pack(side='left', padx=2)
         ttk.Button(events_controls, text="Event Images", command=self._view_photo_journal).pack(side='left', padx=2)
         ttk.Button(events_controls, text="Refresh", command=self._refresh_events).pack(side='left', padx=2)
         ttk.Button(events_controls, text="Export", command=self._export_events).pack(side='left', padx=2)
         ttk.Button(events_controls, text="Clear", command=self._clear_events).pack(side='left', padx=2)
+    
+    def _create_avatar_rectangles(self, parent_frame) -> None:
+        """Create 5 avatar rectangles for recent recognitions."""
+        # Initialize recent avatars buffer
+        self.recent_avatars = [{'name': '', 'avatar_path': None} for _ in range(self.max_recent_avatars)]
+        self.avatar_labels = []
+        
+        # VIGIL letters for initial display
+        vigil_letters = ['V', 'I', 'G', 'I', 'L']
+        
+        for i in range(self.max_recent_avatars):
+            # Create frame for each avatar rectangle
+            avatar_frame = ttk.Frame(parent_frame, relief="solid", borderwidth=1)
+            avatar_frame.pack(fill='x', pady=1)
+            
+            # Avatar label (remove size constraints for images)
+            avatar_label = tk.Label(avatar_frame, text=vigil_letters[i], 
+                                  bg="lightgray", fg="darkblue", 
+                                  font=("Arial", 20, "bold"))
+            avatar_label.pack(pady=2)
+            
+            # Name label (smaller font)
+            name_label = ttk.Label(avatar_frame, text="", font=("Arial", 7))
+            name_label.pack(pady=(0, 2))
+            
+            # Store references
+            self.avatar_labels.append({
+                'frame': avatar_frame,
+                'avatar_label': avatar_label,
+                'name_label': name_label
+            })
+    
+    def _update_recent_avatar(self, object_name: str) -> None:
+        """Update the recent avatars display with a new recognition."""
+        try:
+            # Get avatar path for the object
+            avatar_path = self._get_avatar_path_for_object(object_name)
+            
+            # Update circular buffer
+            self.recent_avatars[self.avatar_index] = {
+                'name': object_name,
+                'avatar_path': avatar_path
+            }
+            
+            # Update UI display
+            self._refresh_avatar_display()
+            
+            # Move to next position (circular buffer)
+            self.avatar_index = (self.avatar_index + 1) % self.max_recent_avatars
+            
+        except Exception as e:
+            self.logger.error(f"Error updating recent avatar: {e}")
+    
+    def _get_avatar_path_for_object(self, object_name: str) -> str:
+        """Get avatar path for an object name."""
+        try:
+            # Force a fresh database connection to avoid caching issues
+            objects_db = get_objects_db()
+            
+            # Debug: Log database path (make it absolute)
+            abs_db_path = os.path.abspath(objects_db.db_path)
+            self.logger.info(f"Database path: {abs_db_path}")
+            
+            # Debug: Log what we're searching for
+            self.logger.info(f"Searching for avatar for: {object_name}")
+            
+            # Force fresh connection by creating new instance
+            from vigil.database.manager import ObjectsDatabase
+            fresh_db = ObjectsDatabase()
+            
+            # Get all objects from the correct table (People table, not objects table)
+            all_objects = fresh_db.get_all_objects()
+            self.logger.info(f"Found {len(all_objects)} objects in database")
+            
+            # If get_all_objects() returns empty, try direct SQL to People table
+            if len(all_objects) == 0:
+                self.logger.warning("No objects found via get_all_objects - trying direct SQL to People table...")
+                import sqlite3
+                conn = sqlite3.connect(fresh_db.db_path)
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM People")
+                count = cursor.fetchone()[0]
+                self.logger.info(f"Direct SQL found {count} objects in People table")
+                if count > 0:
+                    cursor.execute("SELECT first_name, last_name, foto FROM People")
+                    rows = cursor.fetchall()
+                    all_objects = []
+                    for row in rows:
+                        all_objects.append({
+                            'first_name': row[0],
+                            'last_name': row[1], 
+                            'foto': row[2]
+                        })
+                    self.logger.info(f"Loaded {len(all_objects)} objects from People table")
+                conn.close()
+            
+            for db_obj in all_objects:
+                # Create full name from first_name and last_name
+                first_name = db_obj.get('first_name', '')
+                last_name = db_obj.get('last_name', '')
+                full_name = f"{last_name} {first_name}".strip()
+                modelfolder = db_obj.get('modelfolder', '')
+                foto = db_obj.get('foto', '')
+                
+                # Debug: Log each object
+                self.logger.info(f"DB Object: full_name='{full_name}', first_name='{first_name}', last_name='{last_name}', modelfolder='{modelfolder}', foto='{foto}'")
+                
+                # Check if object_name contains the database object's name parts
+                if full_name and full_name in object_name:
+                    obj = db_obj
+                    self.logger.info(f"Found object by full name: {full_name}, avatar: {obj.get('foto')}")
+                    break
+                # Also check individual name parts
+                if first_name and first_name in object_name:
+                    obj = db_obj
+                    self.logger.info(f"Found object by first name: {first_name}, avatar: {obj.get('foto')}")
+                    break
+                if last_name and last_name in object_name:
+                    obj = db_obj
+                    self.logger.info(f"Found object by last name: {last_name}, avatar: {obj.get('foto')}")
+                    break
+                # Check modelfolder as well
+                if modelfolder and modelfolder in object_name:
+                    obj = db_obj
+                    self.logger.info(f"Found object by modelfolder: {modelfolder}, avatar: {obj.get('foto')}")
+                    break
+            
+            if obj and obj.get('foto'):
+                # Construct full path
+                avatar_path = os.path.join(os.getcwd(), "data", "photo", "objects", obj['foto'])
+                self.logger.info(f"Constructed avatar path: {avatar_path}")
+                if os.path.exists(avatar_path):
+                    return avatar_path
+                else:
+                    self.logger.warning(f"Avatar file does not exist: {avatar_path}")
+            
+            # Get object type using the working method and return category-specific default avatar
+            object_type = self._get_object_type_for_name(object_name)
+            default_avatar = self._get_default_avatar_by_type(object_type)
+            default_path = os.path.join(os.getcwd(), "data", "photo", "objects", default_avatar)
+            self.logger.info(f"Using default avatar for {object_type}: {default_path}")
+            return default_path
+            
+        except Exception as e:
+            self.logger.error(f"Error getting avatar path for {object_name}: {e}")
+            return os.path.join(os.getcwd(), "data", "photo", "objects", "no_avatar_red.jpg")
+    
+    def _get_default_avatar_by_type(self, object_type: str) -> str:
+        """Get default avatar filename based on object type."""
+        if object_type == 'Resident' or object_type == '1':
+            return 'no_avatar_green.jpg'
+        elif object_type == 'Visitor' or object_type == '3':
+            return 'no_avatar_blue.jpg'
+        elif object_type == 'Staff' or object_type == '2':
+            return 'no_avatar_grey.jpg'
+        else:  # Unknown or any other
+            return 'no_avatar_red.jpg'
+    
+    def _refresh_avatar_display(self) -> None:
+        """Refresh the avatar display with current buffer data."""
+        try:
+            for i, avatar_data in enumerate(self.recent_avatars):
+                if i < len(self.avatar_labels):
+                    label_set = self.avatar_labels[i]
+                    
+                    if avatar_data.get('name') and avatar_data.get('avatar_path'):
+                        # Load and display avatar
+                        try:
+                            avatar_path = avatar_data['avatar_path']
+                            self.logger.info(f"Loading avatar: {avatar_path}")
+                            
+                            if os.path.exists(avatar_path):
+                                image = Image.open(avatar_path)
+                                image = image.resize((120, 120), Image.Resampling.LANCZOS)
+                                photo = ImageTk.PhotoImage(image)
+                                
+                                # Clear previous image reference
+                                label_set['avatar_label'].image = None
+                                
+                                label_set['avatar_label'].configure(image=photo, text="", bg="white")
+                                label_set['avatar_label'].image = photo  # Keep reference
+                                label_set['name_label'].configure(text=avatar_data['name'][:15])  # Truncate long names
+                                
+                                self.logger.info(f"Successfully loaded avatar for {avatar_data['name']}")
+                            else:
+                                # Show default if file doesn't exist
+                                self.logger.warning(f"Avatar file not found: {avatar_path}")
+                                label_set['avatar_label'].configure(image="", text="DEF", bg="lightgray")
+                                label_set['name_label'].configure(text=avatar_data['name'][:15])
+                            
+                        except Exception as e:
+                            # Fallback to text if image fails
+                            self.logger.error(f"Error loading avatar image: {e}")
+                            label_set['avatar_label'].configure(image="", text="ERR", bg="red")
+                            label_set['name_label'].configure(text=avatar_data['name'][:15])
+                    else:
+                        # Empty slot - show VIGIL letter
+                        vigil_letters = ['V', 'I', 'G', 'I', 'L']
+                        label_set['avatar_label'].configure(image="", text=vigil_letters[i])
+                        label_set['name_label'].configure(text="")
+                        
+        except Exception as e:
+            self.logger.error(f"Error refreshing avatar display: {e}")
     
     def _create_objects_tab(self) -> None:
         """Create the objects management tab."""
@@ -1325,6 +1564,9 @@ class MainWindow:
                                     face['location'], object_type
                                 )
                                 
+                                # Update recent avatars display
+                                self._update_recent_avatar(face_name)
+                                
                                 # Log to traditional event logger
                                 event_logger.log_face_recognition(
                                     face_name, 
@@ -1343,6 +1585,9 @@ class MainWindow:
                             'Unknown', confidence, frame, 
                             face['location'], 'Unknown'
                         )
+                        
+                        # Update recent avatars display for unknown faces
+                        self._update_recent_avatar('Unknown')
                         
                         event_logger.log_unknown_face(
                             confidence,
