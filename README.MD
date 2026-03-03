@@ -1,8 +1,8 @@
 # Vigil (prev. Dozor): Intelligent Video Surveillance System
 
-Vigil is an intelligent software solution designed for real-time video monitoring, object recognition, and event analysis. Developed using Python and Computer Vision technologies, it automates security processes by identifying faces and objects in video streams, logging events, and archiving data.
+Vigil is a comprehensive intelligent video surveillance system designed for real-time monitoring, face recognition, and event analysis. Built with Python and advanced computer vision technologies, it provides enterprise-grade security capabilities with a focus on affordability and accessibility.
 
-The system is designed to be a cost-effective, functional alternative to expensive enterprise security systems, making it suitable for small businesses, residential complexes, and educational institutions.
+The system combines real-time video processing, AI-powered recognition, comprehensive event management, and role-based security to create a complete surveillance solution suitable for businesses, educational institutions, and residential complexes.
 
 ## 📋 Table of Contents
 - [Features](#-features)
@@ -10,52 +10,79 @@ The system is designed to be a cost-effective, functional alternative to expensi
 - [Installation](#-installation)
 - [Usage](#-usage)
 - [Event Journal](#-event-journal)
+- [Object Management](#-object-management)
+- [Event Video Recording](#-event-video-recording)
 - [Project Structure](#-project-structure)
+- [Configuration](#-configuration)
 - [License](#-license)
 
 ## 🚀 Features
 
 ### Real-Time Monitoring & Recognition
-- **Video Streaming**: Streams video from IP cameras or video files
-- **Face & Object Detection**: Detects and recognizes faces/objects using CNN or HOG models
-- **Smart Display**: Shows recognized object names and categories (e.g., "Resident", "Guest", "Attention!")
+- **Multi-Source Video**: Support for IP cameras, webcams, and video files
+- **Advanced Face Recognition**: CNN-based detection with configurable confidence thresholds
+- **Object Classification**: Automatic categorization (Resident, Staff, Visitor, Unknown, Vehicle, Animal, Other)
+- **Smart Display**: Real-time overlay of recognition results with confidence scores
+- **Performance Optimization**: Resolution-aware frame skipping and hardware acceleration support
 
-### Event Logging & Archiving
-- **Automatic Logging**: Logs events with timestamps and recognition confidence
-- **Media Capture**: Saves photo and video clips of specific events
-- **Searchable Journal**: Provides a searchable event log filterable by date or object
-- **Event Journal**: Advanced event session management with photo galleries and detailed object tracking
+### Event Management & Analysis
+- **Intelligent Session Management**: Automatic event grouping based on configurable inactivity periods
+- **Comprehensive Event Journal**: Advanced UI for browsing, filtering, and analyzing events
+- **Multi-Filter Support**: Date range, object name, and object type filtering
+- **Photo Capture System**: Automatic face capture for recognized objects with organized storage
+- **Event Video Recording**: 10-second video clips captured at event start
+- **Responsive Photo Gallery**: Dynamic grid layout (2-8 columns) with vertical scrolling
 
-### Object Management
-- **Profile Management**: Create, edit, and delete observed objects (profiles)
-- **Dataset Management**: Manage photo datasets for model training directly within the interface
-- **Model Training**: Train the recognition model on new data
+### Object Management System
+- **Complete Profile Management**: Create, edit, and delete object profiles
+- **Avatar Management**: Upload custom avatars or use category-based defaults
+- **Dataset Management**: Integrated photo dataset management for training
+- **Model Training**: On-demand face recognition model training
+- **Category-Based Organization**: Automatic classification and color coding
 
 ### Security & Administration
-- **Role-Based Access**: Administrator vs. Operator roles with different permissions
-- **Secure Authentication**: Secure login and session management
-- **Camera Configuration**: Camera connection settings and video quality adjustments
+- **Role-Based Access Control**: Administrator and Operator roles with granular permissions
+- **Secure Authentication**: Encrypted login and session management
+- **Admin Controls**: Event delay configuration, user management, and system settings
+- **Audit Trail**: Comprehensive logging of all system activities
 
-### Performance
-- **Multiprocessing**: Utilizes multiprocessing for smooth UI performance while processing video
-- **Hardware Acceleration**: Supports NVIDIA CUDA acceleration (Tensor Cores)
+### Video & Media Features
+- **Event Video Buffer**: Continuous 10-second circular buffer for event recording
+- **Custom Video Player**: Full-featured player with speed control (0.5x-3.0x) and frame navigation
+- **Video Export**: MP4 format with proper timestamps and metadata
+- **Photo Management**: Automatic capture, storage, and gallery display
+
+### Performance & Architecture
+- **Modular Design**: Clean separation of concerns with focused modules
+- **Multi-Processing**: Smooth UI performance during intensive video processing
+- **Hardware Acceleration**: NVIDIA CUDA support with dlib integration
+- **Database Abstraction**: Unified management of multiple SQLite databases
+- **Error Handling**: Comprehensive exception handling and logging
 
 ## ⚙️ System Requirements
 
 ### Minimum Requirements
 - **Operating System**: Windows 10/11, Linux (Ubuntu 18.04+)
 - **Python**: 3.8 or higher
-- **RAM**: 4GB minimum, 8GB recommended
-- **Storage**: 10GB available space for application and data
-- **GPU**: Optional - NVIDIA GPU with CUDA support for enhanced performance
+- **RAM**: 4GB minimum, 8GB recommended for optimal performance
+- **Storage**: 10GB available space for application, databases, and media
+- **GPU**: Optional - NVIDIA GPU with CUDA support for enhanced face recognition
+
+### Recommended Setup
+- **CPU**: Multi-core processor for video processing
+- **GPU**: NVIDIA GPU with CUDA cores for accelerated face recognition
+- **RAM**: 8GB+ for concurrent video processing and recognition
+- **Storage**: SSD for better database and video performance
 
 ### Dependencies
-Core dependencies are listed in `requirements.txt`. Install using:
+Core dependencies are managed through `requirements.txt`:
+
 ```bash
+# Core dependencies
 pip install -r requirements.txt
 ```
 
-For optimal performance with face recognition, use conda environment:
+For optimal face recognition performance with CUDA acceleration:
 ```bash
 conda create -n dlib-cuda python=3.8
 conda activate dlib-cuda
@@ -66,253 +93,374 @@ pip install -r requirements.txt
 
 ### Prerequisites
 - Python 3.8+ with pip
-- Conda (recommended for face recognition dependencies)
-- Git for cloning the repository
+- Conda (recommended for face recognition with CUDA)
+- Git for repository cloning
+- Optional: NVIDIA GPU with CUDA drivers
 
 ### Setup Steps
+
 1. **Clone Repository**:
    ```bash
    git clone <repository-url>
    cd dozor-clone
    ```
 
-2. **Install Dependencies**:
+2. **Environment Setup**:
    ```bash
-   # Using pip
-   pip install -r requirements.txt
-   
-   # Or using conda (recommended)
+   # Using conda (recommended for face recognition)
    conda create -n dlib-cuda python=3.8
    conda activate dlib-cuda
+   
+   # Or use system Python
+   python -m venv vigil-env
+   source vigil-env/bin/activate  # Linux/Mac
+   # vigil-env\Scripts\activate  # Windows
+   ```
+
+3. **Install Dependencies**:
+   ```bash
    pip install -r requirements.txt
    ```
 
-3. **Run Application**:
+4. **Initial Setup**:
    ```bash
-   # Modular version (recommended)
-   python main_new.py
-   
-   # Original version (legacy)
-   python main.py
+   python setup_admin.py  # Create initial admin account
    ```
 
-### First Run
-1. Launch the application using `python main_new.py`
-2. Create administrator account when prompted
-3. Configure camera settings in the administration panel
-4. Add objects/people to the recognition database
+5. **Run Application**:
+   ```bash
+   python main_new.py  # Modular version (recommended)
+   ```
+
+### First Run Configuration
+1. Launch with `python main_new.py`
+2. Create administrator account through setup wizard
+3. Configure camera sources and settings
+4. Add objects/people to recognition database
+5. Train recognition model with initial dataset
 
 ## 📖 Usage
 
 ### Basic Workflow
-1. **Login**: Use administrator credentials to access the system
-2. **Camera Setup**: Configure IP cameras or video sources in settings
+1. **System Login**: Authenticate with administrator credentials
+2. **Camera Configuration**: Set up video sources in administration panel
 3. **Object Management**: Add profiles for people/objects to recognize
-4. **Monitoring**: Start real-time monitoring from the main dashboard
-5. **Review Events**: Check the event log for recognition activities
+4. **Start Monitoring**: Begin real-time surveillance from main dashboard
+5. **Review Events**: Analyze recognition activities through Event Journal
 
 ### Key Operations
-- **Add New Object**: Navigate to Object Management → Add Profile
-- **Train Model**: Object Management → Train Model with new dataset
-- **View Events**: Event Log → Filter by date/object type
+- **Add Object**: Object Management → Add Profile (with avatar upload)
+- **Train Model**: Object Management → Train Model
+- **View Events**: Events → View Events (with filtering options)
 - **Camera Settings**: Administration → Camera Configuration
+- **User Management**: Administration → User List (admin only)
 
-## � Event Journal
+### Performance Tips
+- Use CUDA-enabled environment for better face recognition speed
+- Adjust confidence thresholds based on lighting conditions
+- Configure appropriate inactivity delays for event grouping
+- Regular maintenance of object datasets and model retraining
 
-The Event Journal is an advanced feature that provides comprehensive event session management with photo galleries and detailed object tracking.
+## 📊 Event Journal
 
-### 🎯 Key Features
+The Event Journal provides comprehensive event session management with advanced filtering, photo galleries, and video playback capabilities.
+
+### 🎯 Core Features
 
 #### Event Session Management
-- **Automatic Session Grouping**: Groups recognition events into sessions based on inactivity periods
-- **Configurable Inactivity Delay**: Default 10 seconds (adjustable by admin users)
-- **Session Duration Tracking**: Automatically calculates and displays session durations
-- **Event Descriptions**: Generates descriptive names with event counters and object counts
+- **Automatic Grouping**: Events grouped into sessions based on inactivity periods
+- **Configurable Delays**: Default 10-second inactivity delay (admin adjustable)
+- **Duration Tracking**: Real-time duration calculation and display
+- **Session Descriptions**: Auto-generated descriptive names (e.g., "event00017-3-objects")
 
-#### Photo Capture & Gallery
-- **Automatic Face Capture**: Captures and saves face images for recognized objects (excludes 'Unknown')
-- **Organized Storage**: Photos stored in `data/captured_faces/` with timestamp-based naming
-- **Responsive Photo Grid**: Adapts to window size (2-8 columns based on available space)
+#### Advanced Filtering System
+- **Date Range Filtering**: Filter events by start/end dates with YYYY-MM-DD format
+- **Object Name Filtering**: Partial text matching for object names
+- **Object Type Filtering**: Dropdown selection (Person, Unknown, Vehicle, Animal, Other)
+- **Combined Filtering**: Apply multiple filters simultaneously
+- **Real-time Results**: Immediate filtering with status feedback
+
+#### Photo Gallery & Management
+- **Automatic Capture**: Face photos captured for recognized objects (excludes 'Unknown')
+- **Organized Storage**: `data/captured_faces/{object_name}/{timestamp}.jpg` structure
+- **Responsive Grid**: 2-8 columns based on window size (140px minimum per photo)
+- **Thumbnail Display**: 120x120px thumbnails with PIL LANCZOS resampling
 - **Vertical Scrolling**: Smooth scrolling through all captured photos
-- **Thumbnail Display**: 120x120px thumbnails with object names and timestamps
 
-#### Event Details & Analysis
-- **Event Table**: Lists all sessions with ID, start time, duration, and description
-- **Object Tracking**: Detailed view of all recognized objects per event
-- **Confidence Scores**: Shows recognition confidence for each object
-- **Timestamp Tracking**: Precise timestamps for all recognition events
+#### Event Video Integration
+- **10-Second Clips**: Automatic video capture at event start
+- **Custom Player**: Full playback controls with speed adjustment (0.5x-3.0x)
+- **Progress Bar**: Time display and frame-by-frame navigation
+- **Video Status**: Dynamic button states based on video availability
 
-#### User Interface
-- **Resizable Window**: Full window controls (minimize, maximize, close)
-- **Responsive Layout**: Adapts to different screen sizes
-- **Admin Controls**: Event delay settings and delete event functionality
-- **Date Filtering**: Filter events by date range (feature placeholder)
-- **Export Capability**: Export event data (feature placeholder)
+### 🔧 Configuration & Access
 
-### 🔧 Configuration
+#### Admin Controls
+- **Event Delay**: Configure inactivity delay for session creation
+- **Event Deletion**: Remove individual events (admin only)
+- **System Settings**: Access to advanced configuration options
 
-#### Event Inactivity Delay
-- **Default**: 10 seconds
-- **Access**: Admin users only
-- **Location**: Event Journal → First row of controls
-- **Purpose**: Determines when to start a new event session after inactivity
+#### Role-Based Access
+- **Administrators**: Full access to all features, configuration, and deletion
+- **Operators**: View-only access to events, photos, and videos
 
-#### Photo Storage
-- **Location**: `data/captured_faces/{object_name}/{timestamp}.jpg`
-- **Format**: JPEG with automatic filename sanitization
-- **Size**: Original capture size with face padding
-- **Cleanup**: Manual management through file system
+#### Database Schema
+- **event_sessions**: Session metadata (ID, timestamps, duration, description)
+- **event_objects**: Recognized objects with confidence scores
+- **event_photos**: Photo records with file paths and timestamps
+- **event_videos**: Video metadata with file information and duration
 
 ### 📱 Usage Guide
 
 #### Accessing Event Journal
-1. **Login** to the Vigil system
+1. Login to Vigil system
 2. Navigate to **Events** → **View Events**
-3. The Event Journal window will open with the event list
+3. Browse events table with sorting and filtering
+
+#### Filtering Events
+1. **Date Filtering**: Enter date range in "From" and "To" fields
+2. **Object Filtering**: Enter partial name in "Object Name" field
+3. **Type Filtering**: Select category from "Object Type" dropdown
+4. **Apply Filters**: Click "Apply Filters" for object filtering, "Filter" for date filtering
 
 #### Viewing Event Details
-1. **Select an event** from the events table
-2. **View object details** in the middle panel
-3. **Browse photos** in the photo gallery below
-4. **Resize window** to adjust photo grid layout
+1. Select event from table
+2. View object details in middle panel
+3. Browse photos in responsive gallery
+4. Watch event video with custom player
 
-#### Admin Operations
-1. **Configure delay**: Set "Event Delay (s)" and click "Update"
-2. **Delete events**: Select event and click "Delete Event" (admin only)
-3. **Export data**: Click "Export" to save event data (admin only)
+## 👥 Object Management
 
-### 🎨 Responsive Photo Grid
+The Object Management system provides comprehensive profile management with avatar support and dataset integration.
 
-The photo gallery automatically adapts to window size:
-- **Small windows** (< 280px): 2 columns
-- **Medium windows** (280-560px): 2-4 columns
-- **Large windows** (560-840px): 4-6 columns
-- **Extra large windows** (> 840px): 6-8 columns
+### 🎯 Features
 
-Photos reorganize automatically when resizing the window, ensuring optimal visibility and no images are thrown off-screen.
+#### Profile Management
+- **Complete CRUD Operations**: Create, read, update, delete object profiles
+- **Avatar System**: Upload custom avatars or use category-based defaults
+- **Category Classification**: Automatic color coding (Resident-Green, Staff-Grey, Visitor-Blue, Unknown-Red)
+- **Metadata Storage**: Object details, photos, and recognition encodings
 
-### 🔐 Role-Based Access
+#### Avatar Management
+- **Custom Upload**: Support for JPG, JPEG, PNG, BMP, GIF (max 5MB)
+- **Default Avatars**: Category-based default avatars with color coding
+- **Unique Naming**: UUID-based file naming to prevent conflicts
+- **Image Processing**: PIL LANCZOS resampling with JPEG quality 85%
+- **Storage Structure**: `data/photo/objects/` with organized subdirectories
 
-#### Administrator Users
-- **Full access** to all Event Journal features
-- **Configure** event inactivity delay
-- **Delete** individual events
-- **Export** event data
-- **View** all photos and details
+#### Dataset Integration
+- **Photo Management**: Add/remove photos for object training
+- **Dataset Organization**: Structured storage in `dataset/{object_name}/`
+- **Training Integration**: Direct integration with face recognition training
+- **Quality Control**: Image validation and processing
 
-#### Operator Users
-- **View** events and photos
-- **Browse** event details
-- **No access** to admin settings
-- **Cannot delete** events
+### 🔐 Security & Permissions
 
-### 📊 Database Schema
+#### Admin-Only Features
+- **Avatar Upload/Removal**: Only users with `can_manage_objects` permission
+- **Profile Creation/Deletion**: Full CRUD access for administrators
+- **Dataset Management**: Training and dataset modification capabilities
 
-The Event Journal uses three main tables in `data/events.db`:
+#### Operator Access
+- **View Profiles**: Browse object information and photos
+- **No Modifications**: Read-only access to object data
 
-#### `event_sessions`
-- `id`: Session identifier
-- `start_time`: Session start timestamp
-- `end_time`: Session end timestamp
-- `duration`: Session duration in seconds
-- `description`: Auto-generated description
+### 📁 Storage Structure
 
-#### `event_objects`
-- `id`: Object record identifier
-- `session_id`: Link to event session
-- `object_name`: Recognized object name
-- `object_type`: Object classification
-- `timestamp`: Recognition timestamp
-- `confidence`: Recognition confidence score
+#### Avatar Storage
+```
+data/photo/objects/
+├── no_avatar_green.jpg    (Resident - Green)
+├── no_avatar_grey.jpg     (Staff - Grey)  
+├── no_avatar_blue.jpg     (Visitor - Blue)
+├── no_avatar_red.jpg      (Unknown - Red)
+└── avatar_*.jpg           (Custom avatars - UUID named)
+```
 
-#### `event_photos`
-- `id`: Photo record identifier
-- `session_id`: Link to event session
-- `photo_path`: File path to captured photo
-- `timestamp`: Photo capture timestamp
-- `object_name`: Object in the photo
+#### Dataset Storage
+```
+dataset/
+├── {object_name}/
+│   ├── photo_001.jpg
+│   ├── photo_002.jpg
+│   └── ...
+```
 
-## �� Project Structure
+## 🎥 Event Video Recording
 
-### Modular Architecture (New)
+Vigil includes automatic event video recording with continuous buffering and custom playback capabilities.
+
+### 🎯 Features
+
+#### Continuous Video Buffer
+- **Circular Buffer**: 10-second buffer at 10 FPS continuously updated
+- **Event Trigger**: Automatic video capture when recognition events occur
+- **Thread-Safe Operations**: Concurrent frame feeding and video processing
+- **Storage Management**: Automatic file naming and directory creation
+
+#### Video Capture System
+- **Event-Based Recording**: 10-second clips saved at event start
+- **MP4 Format**: Standard MP4 with MP4V codec for compatibility
+- **Metadata Storage**: Database integration with video information
+- **File Organization**: `data/event_videos/event_{session_id}_{timestamp}.mp4`
+
+#### Custom Video Player
+- **Full Playback Controls**: Play/Pause, Stop, Seek functionality
+- **Speed Control**: Adjustable playback speed (0.5x to 3.0x)
+- **Progress Bar**: Visual progress with time display
+- **Frame Navigation**: Frame-by-frame stepping capability
+- **Aspect Ratio**: Proper video aspect ratio handling
+
+### 🔧 Technical Implementation
+
+#### Video Buffer (`vigil/video/event_buffer.py`)
+- **Queue-Based Storage**: Thread-safe frame queue with configurable size
+- **Background Processing**: Async video saving and database operations
+- **Error Handling**: Comprehensive error recovery and logging
+- **Performance Optimization**: Efficient frame management and memory usage
+
+#### Video Player (`vigil/gui/dialogs/video_player_dialog.py`)
+- **OpenCV Integration**: CV2 VideoCapture for robust video handling
+- **Threading**: Separate thread for smooth playback
+- **UI Controls**: Tkinter-based interface with modern styling
+- **Cleanup**: Proper resource management and cleanup
+
+#### Database Integration
+- **event_videos Table**: Video metadata storage with session linking
+- **Automatic Cleanup**: Video removal when events are deleted
+- **Query Optimization**: Efficient video retrieval and filtering
+
+### 📱 Usage
+
+#### Automatic Recording
+1. System continuously buffers video frames
+2. Face recognition event triggers new session
+3. 10-second video clip automatically saved
+4. Video metadata stored in database
+5. Video available in Event Journal
+
+#### Playback
+1. Open Event Journal → Select event with video
+2. Click "Open Video" button
+3. Use player controls for playback
+4. Adjust speed with speed control
+5. Navigate frames with seek bar
+
+## 🏗️ Project Structure
+
+Vigil uses a modular architecture with clear separation of concerns and focused modules.
+
+### 📁 Modular Architecture
 ```
 vigil/
 ├── __init__.py                 # Package initialization
 ├── core/                       # Core application components
+│   ├── __init__.py
 │   ├── app.py                 # Main application controller
 │   └── exceptions.py          # Custom exception classes
 ├── config/                     # Configuration management
+│   ├── __init__.py
 │   ├── constants.py           # Application constants
 │   └── settings.py            # Settings with database persistence
 ├── database/                   # Database layer
-│   └── manager.py             # Database operations (4 databases)
+│   ├── __init__.py
+│   ├── manager.py             # Multi-database operations
+│   └── objects_manager.py     # Object-specific database operations
 ├── auth/                       # Authentication & authorization
+│   ├── __init__.py
 │   ├── authentication.py     # User authentication
 │   └── authorization.py      # Role-based access control
 ├── gui/                        # Graphical user interface
+│   ├── __init__.py
 │   ├── main_window.py         # Primary GUI window
-│   └── dialogs/
-│       └── auth_dialog.py     # Authentication dialogs
+│   ├── components/            # Reusable UI components
+│   │   └── __init__.py
+│   └── dialogs/               # Modal dialogs
+│       ├── __init__.py
+│       ├── auth_dialog.py     # Authentication dialogs
+│       ├── event_journal_dialog.py    # Event journal interface
+│       ├── object_dialogs.py          # Object management dialogs
+│       ├── video_player_dialog.py     # Video player dialog
+│       ├── person_selection_dialog.py # Person selection
+│       ├── photo_journal_dialog.py    # Photo gallery
+│       ├── training_dialog.py         # Model training
+│       └── user_list_dialog.py        # User management
 ├── video/                      # Video processing
+│   ├── __init__.py
 │   ├── capture.py             # Video capture from cameras/files
-│   └── processing.py         # Frame processing and encoding
+│   ├── processing.py         # Frame processing and encoding
+│   └── event_buffer.py       # Event video buffering system
 ├── recognition/                # Face/object recognition
-│   └── face_detector.py      # Face detection and recognition
-├── events/                     # Event logging
-│   └── logger.py             # Event logging and management
+│   ├── __init__.py
+│   ├── face_detector.py      # Face detection and recognition
+│   ├── face_trainer.py        # Model training functionality
+│   └── training_service.py   # Training orchestration
+├── events/                     # Event management
+│   ├── __init__.py
+│   ├── logger.py             # Event logging
+│   └── session_manager.py    # Event session management
+├── services/                   # Business logic services
+│   ├── __init__.py
+│   └── object_service.py     # Object management service
+├── models/                     # Data models
+│   ├── __init__.py
+│   └── object.py             # Object data model
 └── utils/                      # Utilities
-    └── logging_config.py     # Centralized logging
+    ├── __init__.py
+    ├── dataset_manager.py    # Dataset management utilities
+    └── logging_config.py     # Centralized logging configuration
 ```
 
-### Legacy Structure (Original)
-- **main.py**: Primary GUI application with tkinter interface (8,155 lines)
-- **webstreaming.py**: Flask-based video streaming server
-- **Database Layer**: SQLite databases for authentication, settings, and recognition data
-
-### Entry Points
-- **main_new.py**: New modular application (recommended)
-- **main.py**: Original monolithic application (preserved for compatibility)
-
-### Database Files
+### 🗄️ Database Structure
+Multiple SQLite databases for different concerns:
 - `data/setting.db`: Application settings and configuration
-- `data/authentication.db`: User authentication and roles
+- `data/authentication.db`: User authentication and role management
 - `data/objects.db`: Recognition profiles and object data
-- `data/camerasetting.db`: Camera configuration
-- `data/events.db`: Event logging and journaling
+- `data/camerasetting.db`: Camera configuration and settings
+- `data/events.db`: Event logging, sessions, photos, and videos
 
-### Configuration Files
-- `requirements.txt`: Python dependencies
-- `encodings.pickle`: Face recognition encodings (generated during training)
-- `log.log`: Application log file
+### 📂 Media Storage
+Organized media storage for efficient access:
+- `data/captured_faces/`: Event photos organized by object
+- `data/event_videos/`: Event video clips with timestamps
+- `data/photo/objects/`: Object avatars and default images
+- `dataset/`: Training datasets organized by object name
 
-## � Recent Refactoring (2025-02-09)
+### 🔧 Entry Points
+- `main_new.py`: Modular application (recommended)
+- `main.py`: Legacy monolithic application (preserved)
+- `setup_admin.py`: Initial administrator setup
+- `webstreaming.py`: Flask-based web streaming server
 
-The application has undergone a major refactoring to improve maintainability, testability, and extensibility:
+## ⚙️ Configuration
 
-### ✅ What Changed
-- **Modular Architecture**: Transformed 8,155-line monolithic `main.py` into focused modules
-- **Separation of Concerns**: Each module has a single responsibility
-- **Dependency Injection**: Removed global variables, improved testability
-- **Enhanced Error Handling**: Custom exceptions and structured logging
-- **Database Abstraction**: Unified database management layer
-- **Role-Based Security**: Comprehensive authentication and authorization system
+### System Settings
+Key configuration options available through the admin interface:
 
-### 🚀 Benefits
-- **Maintainability**: Smaller, focused code files are easier to modify
-- **Testability**: Individual modules can be unit tested independently
-- **Performance**: Optimized resource management and lazy loading
-- **Extensibility**: New features can be added without touching core code
-- **Code Quality**: Better documentation, type hints, and error handling
+#### Recognition Settings
+- **Confidence Threshold**: Minimum confidence for face recognition (default: 45%)
+- **Inactivity Delay**: Event session grouping delay (default: 10 seconds)
+- **Model Training**: On-demand training with dataset management
 
-### 📁 Migration Path
-- **Backward Compatible**: All existing databases and settings preserved
-- **Dual Entry Points**: Both modular (`main_new.py`) and original (`main.py`) available
-- **Gradual Transition**: Can switch between versions during testing phase
+#### Video Settings
+- **Camera Sources**: IP cameras, webcams, and video files
+- **Resolution Settings**: Adaptive processing based on video resolution
+- **Performance Options**: Frame skipping and hardware acceleration
 
-## �👥 License
+#### Security Settings
+- **User Management**: Role-based access control
+- **Authentication**: Secure login and session management
+- **Permission System**: Granular access control for features
 
-MIT License
+### Environment Configuration
+- **CUDA Support**: Optional GPU acceleration for face recognition
+- **Logging Levels**: Configurable logging for debugging and monitoring
+- **Database Paths**: Customizable storage locations
+
+## 📜 License
+
+MIT License - See LICENSE file for details.
 
 ---
 
-**Note**: This software is intended for legitimate security and monitoring purposes. Users must comply with local laws and regulations regarding surveillance and privacy.
+**Important Notice**: This software is intended for legitimate security and monitoring purposes. Users must comply with all applicable local laws and regulations regarding surveillance, privacy, and data protection. The system includes privacy-enhancing features and should be used responsibly and ethically.
