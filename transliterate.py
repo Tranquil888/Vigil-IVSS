@@ -6,6 +6,7 @@ Based on original main.py implementation.
 """
 
 def translit(char: str, source_lang: str = "ru", target_lang: str = "en") -> str:
+    return 0
     """
     Transliterate a single character from Russian to English.
     
