@@ -14,7 +14,6 @@ from vigil.utils.logging_config import get_ui_logger
 from vigil.config.constants import OBJECT_TYPES
 from vigil.auth.authorization import authz_manager
 
-
 class EventJournalDialog:
     """Dialog for viewing event journal with photos and details."""
     
@@ -24,47 +23,39 @@ class EventJournalDialog:
         self.logger = get_ui_logger()
         self.db = get_events_db()
         
-        # Create dialog window
         self.dialog = tk.Toplevel(root)
         self.dialog.title("Event Journal")
         self.dialog.geometry("1200x700")
         
-        # Make window resizable and enable maximize button
         self.dialog.resizable(True, True)
         self.dialog.attributes('-toolwindow', False)  # Enable maximize button
         
         # Min size to prevent UI issues
         self.dialog.minsize(800, 600)
         
-        # State
         self.selected_event_id = None
         self.current_photos = []
         self.photo_thumbnails = []
         self.status_var = tk.StringVar(value="Ready")
         self.selected_photos = set()  # Track selected photos for dataset addition
         
-        # Create UI
         self._create_widgets()
         self._load_available_dates()
         self._load_events()
         
-        # Handle window closing
         self.dialog.protocol("WM_DELETE_WINDOW", self._on_closing)
     
     def _create_widgets(self) -> None:
         """Create dialog widgets."""
-        # Main container
         main_frame = ttk.Frame(self.dialog, padding="5")
         main_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        # Configure grid weights
         self.dialog.columnconfigure(0, weight=1)
         self.dialog.rowconfigure(1, weight=1)
         main_frame.columnconfigure(0, weight=1)
         main_frame.rowconfigure(1, weight=1)
-        main_frame.rowconfigure(2, weight=0)  # Button controls row
+        main_frame.rowconfigure(2, weight=0)
         
-        # Filter controls
         self._create_filter_controls(main_frame)
         
         # Content area (events table on left, details on right)
@@ -74,13 +65,10 @@ class EventJournalDialog:
         content_frame.columnconfigure(1, weight=1)
         content_frame.rowconfigure(0, weight=1)
         
-        # Events table (left side)
         self._create_events_table(content_frame)
         
-        # Event details (right side)
         self._create_event_details(content_frame)
         
-        # Button controls
         self._create_button_controls(main_frame)
     
     def _create_filter_controls(self, parent) -> None:
@@ -89,11 +77,9 @@ class EventJournalDialog:
         filter_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
         filter_frame.columnconfigure(1, weight=1)
         
-        # First row - Date filters and Event Delay
         controls_frame = ttk.Frame(filter_frame)
         controls_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 5))
         
-        # Date filters
         ttk.Label(controls_frame, text="From:").pack(side=tk.LEFT, padx=(0, 5))
         self.start_date_var = tk.StringVar()
         self.start_date_combo = ttk.Combobox(controls_frame, textvariable=self.start_date_var, width=12)
@@ -104,11 +90,9 @@ class EventJournalDialog:
         self.end_date_combo = ttk.Combobox(controls_frame, textvariable=self.end_date_var, width=12)
         self.end_date_combo.pack(side=tk.LEFT, padx=(0, 10))
         
-        # Filter buttons
         ttk.Button(controls_frame, text="Filter", command=self._load_events).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(controls_frame, text="Clear", command=self._clear_filter).pack(side=tk.LEFT, padx=(0, 10))
         
-        # Event delay setting (admin only) - moved to first row
         if self.main_window and authz_manager.has_permission(self.main_window.current_role, 'admin_access'):
             ttk.Label(controls_frame, text="Event Delay (s):", font=('Arial', 10, 'bold')).pack(side=tk.LEFT, padx=(10, 5))
             self.delay_var = tk.StringVar(value="10")
@@ -116,7 +100,6 @@ class EventJournalDialog:
             delay_entry.pack(side=tk.LEFT, padx=(0, 5))
             ttk.Button(controls_frame, text="Update", command=self._update_delay).pack(side=tk.LEFT)
         
-        # Second row - Object and Type filters
         object_frame = ttk.Frame(filter_frame)
         object_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(5, 0))
         
@@ -136,48 +119,39 @@ class EventJournalDialog:
     
     def _create_events_table(self, parent) -> None:
         """Create events table."""
-        # Events frame
         events_frame = ttk.LabelFrame(parent, text="Events", padding="5")
         events_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 5))
         events_frame.columnconfigure(0, weight=1)
         events_frame.rowconfigure(0, weight=1)
         
-        # Treeview for events
         columns = ('id', 'start_time', 'duration', 'description')
         self.events_tree = ttk.Treeview(events_frame, columns=columns, show='headings', height=15)
         
-        # Define headings
         self.events_tree.heading('id', text='Event #')
         self.events_tree.heading('start_time', text='Start Time')
         self.events_tree.heading('duration', text='Duration (s)')
         self.events_tree.heading('description', text='Description')
         
-        # Configure column widths
         self.events_tree.column('id', width=80)
         self.events_tree.column('start_time', width=150)
         self.events_tree.column('duration', width=100)
         self.events_tree.column('description', width=150)
         
-        # Scrollbar
         events_scrollbar = ttk.Scrollbar(events_frame, orient=tk.VERTICAL, command=self.events_tree.yview)
         self.events_tree.configure(yscrollcommand=events_scrollbar.set)
         
-        # Grid widgets
         self.events_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         events_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
         
-        # Bind selection event
         self.events_tree.bind('<<TreeviewSelect>>', self._on_event_select)
     
     def _create_event_details(self, parent) -> None:
         """Create event details panel."""
-        # Details frame
         details_frame = ttk.Frame(parent)
         details_frame.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S))
         details_frame.columnconfigure(0, weight=1)
         details_frame.rowconfigure(1, weight=1)
         
-        # Event info
         info_frame = ttk.LabelFrame(details_frame, text="Event Information", padding="5")
         info_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 5))
         info_frame.columnconfigure(1, weight=1)
@@ -194,43 +168,35 @@ class EventJournalDialog:
         self.duration_label = ttk.Label(info_frame, text="-")
         self.duration_label.grid(row=2, column=1, sticky=tk.W, padx=(10, 0))
         
-        # Objects table
         objects_frame = ttk.LabelFrame(details_frame, text="Recognized Objects", padding="5")
         objects_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         objects_frame.columnconfigure(0, weight=1)
         objects_frame.rowconfigure(0, weight=1)
         
-        # Treeview for objects
         object_columns = ('timestamp', 'object_name', 'object_type', 'confidence')
         self.objects_tree = ttk.Treeview(objects_frame, columns=object_columns, show='headings', height=8)
         
-        # Define headings
         self.objects_tree.heading('timestamp', text='Time')
         self.objects_tree.heading('object_name', text='Object Name')
         self.objects_tree.heading('object_type', text='Type')
         self.objects_tree.heading('confidence', text='Confidence')
         
-        # Configure column widths
         self.objects_tree.column('timestamp', width=120)
         self.objects_tree.column('object_name', width=120)
         self.objects_tree.column('object_type', width=80)
         self.objects_tree.column('confidence', width=80)
         
-        # Scrollbar for objects
         objects_scrollbar = ttk.Scrollbar(objects_frame, orient=tk.VERTICAL, command=self.objects_tree.yview)
         self.objects_tree.configure(yscrollcommand=objects_scrollbar.set)
         
-        # Grid widgets
         self.objects_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         objects_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
         
-        # Photos frame
         photos_frame = ttk.LabelFrame(details_frame, text="Event Photos", padding="5")
         photos_frame.grid(row=2, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(5, 0))
         photos_frame.columnconfigure(0, weight=1)
         photos_frame.rowconfigure(0, weight=1)
         
-        # Photos canvas with VERTICAL scrollbar for grid layout
         self.photos_canvas = tk.Canvas(photos_frame, bg='white')
         photos_scrollbar = ttk.Scrollbar(photos_frame, orient=tk.VERTICAL, command=self.photos_canvas.yview)
         self.photos_canvas.configure(yscrollcommand=photos_scrollbar.set)
@@ -238,11 +204,9 @@ class EventJournalDialog:
         self.photos_frame_inner = ttk.Frame(self.photos_canvas)
         self.photos_canvas.create_window((0, 0), window=self.photos_frame_inner, anchor='nw')
         
-        # Grid widgets
         self.photos_canvas.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         photos_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
         
-        # Bind canvas events
         self.photos_frame_inner.bind('<Configure>', self._on_photos_frame_configure)
         self.photos_canvas.bind('<Configure>', self._on_photos_canvas_configure)
     
@@ -251,7 +215,6 @@ class EventJournalDialog:
         button_frame = ttk.Frame(parent)
         button_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(10, 0))
         
-        # Left buttons
         ttk.Button(button_frame, text="Refresh", command=self._load_events).pack(side=tk.LEFT, padx=(0, 5))
         self.video_button = ttk.Button(button_frame, text="Open Video", command=self._open_video, state="disabled")
         self.video_button.pack(side=tk.LEFT, padx=(0, 5))
@@ -261,11 +224,9 @@ class EventJournalDialog:
         if self.main_window and authz_manager.has_permission(self.main_window.current_role, 'admin'):
             ttk.Button(button_frame, text="Delete Event", command=self._delete_event).pack(side=tk.LEFT, padx=(0, 5))
         
-        # Right buttons
         ttk.Button(button_frame, text="Export", command=self._export_event).pack(side=tk.RIGHT, padx=(5, 0))
         ttk.Button(button_frame, text="Close", command=self._on_closing).pack(side=tk.RIGHT, padx=(5, 0))
         
-        # Status bar
         status_frame = ttk.Frame(parent)
         status_frame.grid(row=3, column=0, sticky=(tk.W, tk.E), pady=(5, 0))
         
@@ -275,44 +236,36 @@ class EventJournalDialog:
     def _load_events(self) -> None:
         """Load events from database."""
         try:
-            # Clear existing items
             for item in self.events_tree.get_children():
                 self.events_tree.delete(item)
             
-            # Get date filter values
             start_date = self.start_date_var.get().strip()
             end_date = self.end_date_var.get().strip()
             
-            # Handle "All" option for dates
             start_date = None if start_date == "All" else start_date
             end_date = None if end_date == "All" else end_date
             
-            # Get events from database with date filtering
             events = self.db.get_event_sessions(
                 limit=200, 
                 start_date=start_date,
                 end_date=end_date
             )
             
-            # Add events to tree
             for event in events:
                 event_id = event['id']
                 start_time = event['start_time']
                 duration = event.get('duration', 0)
                 description = event.get('description', f'event{event_id:05d}')
                 
-                # Format duration properly
                 if duration and duration > 0:
                     duration_str = f"{duration}s"
                 else:
                     duration_str = "active"
                 
-                # Add to tree
                 self.events_tree.insert('', 'end', values=(
                     event_id, start_time, duration_str, description
                 ))
             
-            # Update status
             filter_text = []
             if start_date:
                 filter_text.append(f"From: {start_date}")
@@ -330,14 +283,11 @@ class EventJournalDialog:
         try:
             dates = self.db.get_available_event_dates()
             
-            # Add "All" option at the beginning
             all_dates = ["All"] + dates
             
-            # Update dropdowns
             self.start_date_combo['values'] = all_dates
             self.end_date_combo['values'] = all_dates
             
-            # Set default values
             self.start_date_var.set("All")
             self.end_date_var.set("All")
             
@@ -364,17 +314,14 @@ class EventJournalDialog:
     def _load_event_details(self, event_id: int) -> None:
         """Load details for selected event."""
         try:
-            # Get event session
             session = self.db.get_event_session(event_id)
             if not session:
                 return
             
-            # Update info labels
             self.event_id_label.config(text=str(event_id))
             self.start_time_label.config(text=session['start_time'])
             self.duration_label.config(text=f"{session.get('duration', 0)} seconds")
             
-            # Check for videos and update button state
             videos = self.db.get_event_videos(event_id)
             if videos:
                 self.video_button.config(state="normal")
@@ -383,7 +330,6 @@ class EventJournalDialog:
                 self.video_button.config(state="disabled")
                 self.status_var.set("No video available for this event")
             
-            # Load objects and photos (without filters initially)
             self._load_event_objects(event_id)
             self._load_event_photos(event_id)
             
@@ -393,14 +339,11 @@ class EventJournalDialog:
     def _load_event_objects(self, event_id: int, object_name: str = None, object_type: str = None) -> None:
         """Load objects for selected event with optional filtering."""
         try:
-            # Clear existing items
             for item in self.objects_tree.get_children():
                 self.objects_tree.delete(item)
             
-            # Get objects from database with filters
             objects = self.db.get_event_objects(event_id, object_name, object_type)
             
-            # Add objects to tree
             for obj in objects:
                 timestamp = obj['timestamp']
                 obj_name = obj['object_name']
@@ -417,22 +360,18 @@ class EventJournalDialog:
     def _load_event_photos(self, event_id: int, object_name: str = None) -> None:
         """Load photos for selected event with optional object name filtering."""
         try:
-            # Clear existing photos
             for widget in self.photos_frame_inner.winfo_children():
                 widget.destroy()
             
             self.photo_thumbnails.clear()
             
-            # Get photos from database with object name filter
             photos = self.db.get_event_photos(event_id, object_name)
             
             if not photos:
-                # Show no photos message
                 ttk.Label(self.photos_frame_inner, text="No photos available", 
                          font=('Arial', 10)).pack(pady=20)
                 return
             
-            # Create photo thumbnails
             for i, photo in enumerate(photos):
                 photo_path = photo['photo_path']
                 
@@ -447,7 +386,6 @@ class EventJournalDialog:
     def _create_photo_thumbnail(self, photo_path: str, photo_data: Dict, index: int) -> None:
         """Create a photo thumbnail in a responsive grid layout."""
         try:
-            # Load and resize image
             image = Image.open(photo_path)
             image.thumbnail((120, 120), Image.Resampling.LANCZOS)
             photo = ImageTk.PhotoImage(image)
@@ -455,27 +393,22 @@ class EventJournalDialog:
             # Store reference to prevent garbage collection
             self.photo_thumbnails.append(photo)
             
-            # Calculate grid position dynamically based on current window width
             cols = self._calculate_photo_columns()
             row = index // cols
             col = index % cols
             
-            # Create frame for photo
             photo_frame = ttk.Frame(self.photos_frame_inner, relief=tk.RAISED, borderwidth=1)
             photo_frame.grid(row=row, column=col, padx=5, pady=5, sticky=(tk.W, tk.E, tk.N, tk.S))
             
-            # Photo label with click binding
             photo_label = ttk.Label(photo_frame, image=photo)
             photo_label.pack(pady=(5, 2))
             photo_label.bind('<Button-1>', lambda e, path=photo_path, data=photo_data: self._on_photo_click(e, path, data))
             
-            # Selection indicator (initially hidden)
             selection_var = tk.BooleanVar(value=False)
             selection_check = ttk.Checkbutton(photo_frame, variable=selection_var, 
                                          command=lambda p=photo_path, v=selection_var: self._on_photo_selection(p, v))
             selection_check.pack(pady=(0, 2))
             
-            # Info label
             info_text = f"{photo_data['object_name']}\n{photo_data['timestamp']}"
             info_label = ttk.Label(photo_frame, text=info_text, font=('Arial', 8), wraplength=110)
             info_label.pack(pady=(0, 5))
@@ -486,45 +419,38 @@ class EventJournalDialog:
     def _calculate_photo_columns(self) -> int:
         """Calculate optimal number of photo columns based on canvas width."""
         try:
-            # Get current canvas width
             canvas_width = self.photos_canvas.winfo_width()
             
             # Minimum width per photo (including padding)
             min_photo_width = 140  # 120px image + 20px padding
             
-            # Calculate columns, ensuring at least 2 and max 8
             if canvas_width > 1:  # Valid width
                 cols = max(2, min(8, canvas_width // min_photo_width))
             else:
-                cols = 4  # Default fallback
+                cols = 4
             
             return cols
         except:
-            return 4  # Default fallback
+            return 4
     
     def _on_photos_frame_configure(self, event) -> None:
         """Handle photos frame configure event."""
-        # Update scroll region to encompass all photos
         self.photos_canvas.configure(scrollregion=self.photos_canvas.bbox('all'))
         
-        # Configure grid columns dynamically
         cols = self._calculate_photo_columns()
-        for i in range(cols):  # Dynamic number of columns
+        for i in range(cols):
             self.photos_frame_inner.columnconfigure(i, weight=1, minsize=130)
     
     def _on_photos_canvas_configure(self, event) -> None:
         """Handle photos canvas configure event - refresh layout on resize."""
-        # Update canvas width
         canvas_width = event.width
         self.photos_canvas.itemconfig(self.photos_canvas.find_all()[0], width=canvas_width)
         
-        # Refresh photo layout to adapt to new width
         self._refresh_photo_layout()
     
     def _refresh_photo_layout(self) -> None:
         """Refresh photo layout to adapt to new window size."""
         try:
-            # Get current selected event
             selected_items = self.events_tree.selection()
             if selected_items:
                 event_id = self.events_tree.item(selected_items[0])['values'][0]
@@ -535,11 +461,9 @@ class EventJournalDialog:
     def _apply_filter(self) -> None:
         """Apply date filter to events."""
         try:
-            # Validate date format
             start_date = self.start_date_var.get().strip()
             end_date = self.end_date_var.get().strip()
             
-            # Basic date validation (YYYY-MM-DD format)
             date_pattern = r'^\d{4}-\d{2}-\d{2}$'
             
             if start_date and not re.match(date_pattern, start_date):
@@ -550,7 +474,6 @@ class EventJournalDialog:
                 messagebox.showerror("Invalid Date", "End date must be in YYYY-MM-DD format")
                 return
             
-            # Apply filter by reloading events
             self._load_events()
             
         except Exception as e:
@@ -570,15 +493,12 @@ class EventJournalDialog:
                 messagebox.showwarning("No Event Selected", "Please select an event first")
                 return
             
-            # Get filter values
             object_name = self.object_name_var.get().strip()
             object_type = self.object_type_var.get().strip()
             
-            # Apply filters by reloading photos and objects
             self._load_event_objects(self.selected_event_id, object_name, object_type)
             self._load_event_photos(self.selected_event_id, object_name)
             
-            # Update status
             filter_text = []
             if object_name:
                 filter_text.append(f"Name: {object_name}")
@@ -601,7 +521,6 @@ class EventJournalDialog:
             self.object_name_var.set("")
             self.object_type_var.set("")
             
-            # Reload photos and objects without filters
             if self.selected_event_id:
                 self._load_event_photos(self.selected_event_id)
             
@@ -619,7 +538,6 @@ class EventJournalDialog:
                 messagebox.showerror("Error", "Delay must be at least 1 second")
                 return
             
-            # Update session manager delay
             from vigil.events.session_manager import session_manager
             session_manager.set_inactivity_delay(delay)
             
@@ -638,7 +556,6 @@ class EventJournalDialog:
                               f"Are you sure you want to delete event {self.selected_event_id}?\n"
                               "This will permanently delete all associated photos and data."):
             try:
-                # Delete from database
                 success = self.db.delete_event_session(self.selected_event_id)
                 
                 if success:
@@ -659,7 +576,6 @@ class EventJournalDialog:
             return
         
         try:
-            # Choose export location
             filename = filedialog.asksaveasfilename(
                 defaultextension=".txt",
                 filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
@@ -669,7 +585,6 @@ class EventJournalDialog:
             if not filename:
                 return
             
-            # Export event data
             self._export_event_to_file(self.selected_event_id, filename)
             
             messagebox.showinfo("Success", f"Event exported to {filename}")
@@ -682,12 +597,10 @@ class EventJournalDialog:
         """Export event data to file."""
         try:
             with open(filename, 'w', encoding='utf-8') as f:
-                # Get event data
                 session = self.db.get_event_session(event_id)
                 objects = self.db.get_event_objects(event_id)
                 photos = self.db.get_event_photos(event_id)
                 
-                # Write event header
                 f.write(f"Event Export: {event_id:05d}\n")
                 f.write("=" * 50 + "\n\n")
                 
@@ -698,7 +611,6 @@ class EventJournalDialog:
                     f.write(f"Duration: {session.get('duration', 0)} seconds\n")
                     f.write(f"Description: {session.get('description', 'N/A')}\n\n")
                 
-                # Write objects
                 f.write("Recognized Objects:\n")
                 f.write("-" * 20 + "\n")
                 for obj in objects:
@@ -708,7 +620,6 @@ class EventJournalDialog:
                     f.write(f"Confidence: {obj.get('confidence', 0):.2f}\n")
                     f.write("-" * 10 + "\n")
                 
-                # Write photos
                 f.write("\nPhotos:\n")
                 f.write("-" * 20 + "\n")
                 for photo in photos:
@@ -725,36 +636,29 @@ class EventJournalDialog:
         """Clear event details panel."""
         self.selected_event_id = None
         
-        # Clear info labels
         self.event_id_label.config(text="-")
         self.start_time_label.config(text="-")
         self.duration_label.config(text="-")
         
-        # Clear objects tree
         for item in self.objects_tree.get_children():
             self.objects_tree.delete(item)
         
-        # Clear photos
         for widget in self.photos_frame_inner.winfo_children():
             widget.destroy()
         self.photo_thumbnails.clear()
         
-        # Disable video button
         self.video_button.config(state="disabled")
         self.add_to_dataset_button.config(state="disabled")
     
     def _on_photo_click(self, event, photo_path: str, photo_data: Dict) -> None:
         """Handle photo click for selection."""
-        # Toggle selection
         if photo_path in self.selected_photos:
             self.selected_photos.remove(photo_path)
         else:
             self.selected_photos.add(photo_path)
         
-        # Update button state
         self.add_to_dataset_button.config(state="normal" if self.selected_photos else "disabled")
         
-        # Update status
         self.status_var.set(f"Selected {len(self.selected_photos)} photo(s)")
     
     def _on_photo_selection(self, photo_path: str, selection_var: tk.BooleanVar) -> None:
@@ -764,10 +668,8 @@ class EventJournalDialog:
         else:
             self.selected_photos.discard(photo_path)
         
-        # Update button state
         self.add_to_dataset_button.config(state="normal" if self.selected_photos else "disabled")
         
-        # Update status
         self.status_var.set(f"Selected {len(self.selected_photos)} photo(s)")
     
     def _add_to_dataset(self) -> None:
@@ -777,7 +679,6 @@ class EventJournalDialog:
             return
         
         try:
-            # Show person selection dialog
             from vigil.gui.dialogs.person_selection_dialog import PersonSelectionDialog
             from vigil.config.constants import get_data_dir
             
@@ -788,7 +689,6 @@ class EventJournalDialog:
             if not selected_person:
                 return  # User cancelled
             
-            # Add photos to dataset
             from vigil.utils.dataset_manager import DatasetManager
             dataset_manager = DatasetManager()
             
@@ -800,18 +700,16 @@ class EventJournalDialog:
                 
                 # Small delay to ensure unique timestamps
                 if i < len(self.selected_photos) - 1:
-                    time.sleep(0.01)  # 10ms delay between images
+                    time.sleep(0.01)
             
             if success_count > 0:
                 messagebox.showinfo("Success", 
                                  f"Added {success_count} photo(s) to {selected_person}'s dataset.")
                 
-                # Clear selection
                 self.selected_photos.clear()
                 self.add_to_dataset_button.config(state="disabled")
                 self.status_var.set(f"Added {success_count} photo(s) to dataset")
                 
-                # Ask if user wants to retrain model
                 result = messagebox.askyesno("Retrain Model", 
                                            "Would you like to retrain the face recognition model with the new images?")
                 if result:
@@ -826,7 +724,6 @@ class EventJournalDialog:
     def _trigger_training(self) -> None:
         """Trigger model training."""
         try:
-            # Get training service from main window
             if hasattr(self.main_window, 'training_service'):
                 training_service = self.main_window.training_service
                 
@@ -835,7 +732,6 @@ class EventJournalDialog:
                                        "Model training is already in progress.")
                     return
                 
-                # Start training
                 success = training_service.start_training()
                 if success:
                     self.status_var.set("Model training started...")
@@ -856,23 +752,20 @@ class EventJournalDialog:
             return
         
         try:
-            # Get videos for this event
             videos = self.db.get_event_videos(self.selected_event_id)
             
             if not videos:
                 messagebox.showinfo("No Video", "No video available for this event.")
                 return
             
-            # For now, open the first video (could add selection dialog for multiple videos)
+            # Open the first video only; multiple videos have no selection dialog yet.
             video = videos[0]
             video_path = video['video_path']
             
-            # Check if video file exists
             if not os.path.exists(video_path):
                 messagebox.showerror("Video Not Found", f"Video file not found:\n{video_path}")
                 return
             
-            # Open video player dialog
             from vigil.gui.dialogs.video_player_dialog import VideoPlayerDialog
             
             title = f"Event Video - Event {self.selected_event_id:05d}"

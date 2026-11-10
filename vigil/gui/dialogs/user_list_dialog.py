@@ -26,17 +26,14 @@ class UserListDialog:
         self.window.geometry("600x450")
         self.window.resizable(True, True)
         
-        # Center the dialog
         self._center_window()
         
-        # Make dialog modal
         self.window.transient(self.parent)
         self.window.grab_set()
         
         self._create_widgets()
         self._load_users()
         
-        # Wait for dialog to close
         self.window.wait_window()
     
     def _center_window(self) -> None:
@@ -48,7 +45,6 @@ class UserListDialog:
     
     def _create_widgets(self) -> None:
         """Create dialog widgets."""
-        # Title label
         title_label = tk.Label(
             self.window,
             text="User Management",
@@ -56,7 +52,6 @@ class UserListDialog:
         )
         title_label.pack(pady=10)
         
-        # Current role indicator
         role_label = tk.Label(
             self.window,
             text=f"Viewing as: {self.current_role.title()}",
@@ -65,11 +60,9 @@ class UserListDialog:
         )
         role_label.pack(pady=5)
         
-        # Treeview frame
         tree_frame = ttk.Frame(self.window)
         tree_frame.pack(fill='both', expand=True, padx=10, pady=10)
         
-        # Create treeview with scrollbar
         self.tree = ttk.Treeview(
             tree_frame,
             columns=('username', 'role', 'created_at', 'last_login'),
@@ -77,30 +70,24 @@ class UserListDialog:
             height=12
         )
         
-        # Configure columns
         self.tree.heading('username', text='Username')
         self.tree.heading('role', text='Role')
         self.tree.heading('created_at', text='Created At')
         self.tree.heading('last_login', text='Last Login')
         
-        # Column widths
         self.tree.column('username', width=150)
         self.tree.column('role', width=100)
         self.tree.column('created_at', width=150)
         self.tree.column('last_login', width=150)
         
-        # Add scrollbar
         scrollbar = ttk.Scrollbar(tree_frame, orient='vertical', command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
         
-        # Bind selection event
         self.tree.bind('<<TreeviewSelect>>', self._on_selection_change)
         
-        # Pack treeview and scrollbar
         self.tree.pack(side='left', fill='both', expand=True)
         scrollbar.pack(side='right', fill='y')
         
-        # Buttons frame
         buttons_frame = ttk.Frame(self.window)
         buttons_frame.pack(pady=10)
         
@@ -129,7 +116,6 @@ class UserListDialog:
         )
         close_button.pack(side='left', padx=5)
         
-        # Status label
         self.status_label = tk.Label(
             self.window,
             text="",
@@ -161,20 +147,16 @@ class UserListDialog:
     
     def _load_users(self) -> None:
         """Load and display users in the treeview."""
-        # Clear existing items
         for item in self.tree.get_children():
             self.tree.delete(item)
         
-        # Get filtered users
         users = self._get_filtered_users()
         
         if not users:
             self.status_label.config(text="No users found")
             return
         
-        # Add users to treeview
         for user in users:
-            # Format datetime fields
             created_at = user.get('created_at') or 'N/A'
             last_login = user.get('last_login') or 'Never'
             
@@ -195,15 +177,12 @@ class UserListDialog:
                 )
             )
         
-        # Update status
         user_count = len(users)
         if self.current_role == 'admin':
             self.status_label.config(text=f"Showing all {user_count} users")
-            # Enable delete button for admins
             self.delete_button.config(state='normal')
         else:
             self.status_label.config(text=f"Showing {user_count} operators (admins hidden)")
-            # Disable delete button for operators
             self.delete_button.config(state='disabled')
         
         # Initially disable delete button until user is selected
@@ -213,23 +192,19 @@ class UserListDialog:
     def _delete_user(self) -> None:
         """Delete selected user (admin only)."""
         try:
-            # Get selected user
             selected = self.tree.selection()
             if not selected:
                 messagebox.showwarning("No Selection", "Please select a user to delete")
                 return
             
-            # Get user data from treeview
             item = self.tree.item(selected[0])
             username = item['values'][0]
             role = item['values'][1]
             
-            # Safety checks
             if role == 'admin':
                 messagebox.showerror("Error", "Cannot delete administrator accounts")
                 return
             
-            # Confirm deletion
             result = messagebox.askyesno(
                 "Confirm Deletion",
                 f"Are you sure you want to delete user '{username}'?\n\nThis action cannot be undone."
@@ -238,13 +213,11 @@ class UserListDialog:
             if not result:
                 return
             
-            # Delete user
             success, message = auth_manager.delete_user(username)
             
             if success:
                 self.logger.info(f"User '{username}' deleted by admin '{self.current_role}'")
                 messagebox.showinfo("Success", f"User '{username}' deleted successfully")
-                # Refresh user list
                 self._load_users()
             else:
                 messagebox.showerror("Error", f"Failed to delete user: {message}")

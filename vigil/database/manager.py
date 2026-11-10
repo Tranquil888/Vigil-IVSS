@@ -138,16 +138,13 @@ class SettingsDatabase(DatabaseManager):
     
     def set_setting(self, parameter_name: str, *values) -> None:
         """Set a setting value."""
-        # Check if setting exists
         existing = self.execute_query('SELECT parametr_name FROM setting WHERE parametr_name = ?', (parameter_name,))
         
         if existing:
-            # Update existing setting
             placeholders = ','.join([f'set{i+1} = ?' for i in range(len(values))])
             query = f'UPDATE setting SET {placeholders} WHERE parametr_name = ?'
             self.execute_update(query, values + (parameter_name,))
         else:
-            # Insert new setting
             all_values = (parameter_name,) + values + (None,) * (10 - len(values) - 1)
             placeholders = ','.join(['?'] * len(all_values))
             query = f'INSERT INTO setting VALUES ({placeholders})'
@@ -254,7 +251,6 @@ class ObjectsDatabase(DatabaseManager):
         query = f'INSERT INTO objects ({",".join(fields)}) VALUES ({placeholders})'
         self.execute_update(query, tuple(values))
         
-        # Get the ID of the inserted record
         result = self.execute_query('SELECT last_insert_rowid()')
         return result[0]['last_insert_rowid()']
     
@@ -322,7 +318,6 @@ class CameraDatabase(DatabaseManager):
     def _migrate_database(self) -> None:
         """Migrate existing database to new schema."""
         try:
-            # Check if name column exists
             result = self.execute_query("PRAGMA table_info(cameras)")
             columns = [row['name'] for row in result]
             
@@ -339,7 +334,6 @@ class CameraDatabase(DatabaseManager):
     
     def create_camera(self, activ_number: str, link: str = None, source_type: str = 'camera', name: str = None, **settings) -> int:
         """Create a new camera record."""
-        # Build fields and values dynamically
         fields = ['activ_number']
         values = [activ_number]
         
@@ -354,7 +348,6 @@ class CameraDatabase(DatabaseManager):
         fields.append('source_type')
         values.append(source_type)
         
-        # Add any additional settings
         for key, value in settings.items():
             if key.startswith('cam_set_'):
                 fields.append(key)
@@ -410,7 +403,6 @@ class EventSessionsDatabase(DatabaseManager):
     
     def _create_tables(self) -> None:
         """Create event sessions and photos tables."""
-        # Event sessions table
         sessions_query = '''
             CREATE TABLE IF NOT EXISTS event_sessions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -423,7 +415,6 @@ class EventSessionsDatabase(DatabaseManager):
         '''
         self.execute_update(sessions_query)
         
-        # Event photos table
         photos_query = '''
             CREATE TABLE IF NOT EXISTS event_photos (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -437,7 +428,6 @@ class EventSessionsDatabase(DatabaseManager):
         '''
         self.execute_update(photos_query)
         
-        # Event objects table for tracking objects in sessions
         objects_query = '''
             CREATE TABLE IF NOT EXISTS event_objects (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -451,7 +441,6 @@ class EventSessionsDatabase(DatabaseManager):
         '''
         self.execute_update(objects_query)
         
-        # Event videos table for storing video clips
         videos_query = '''
             CREATE TABLE IF NOT EXISTS event_videos (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -467,7 +456,6 @@ class EventSessionsDatabase(DatabaseManager):
         '''
         self.execute_update(videos_query)
         
-        # Create indexes for better performance
         self.execute_update('CREATE INDEX IF NOT EXISTS idx_sessions_start_time ON event_sessions(start_time)')
         self.execute_update('CREATE INDEX IF NOT EXISTS idx_photos_event_id ON event_photos(event_id)')
         self.execute_update('CREATE INDEX IF NOT EXISTS idx_objects_event_id ON event_objects(event_id)')
@@ -534,7 +522,6 @@ class EventSessionsDatabase(DatabaseManager):
         '''
         params = []
         
-        # Add date filtering if provided
         if start_date or end_date:
             conditions = []
             if start_date:
@@ -574,7 +561,6 @@ class EventSessionsDatabase(DatabaseManager):
         '''
         params = [session_id]
         
-        # Add object name filter if provided
         if object_name:
             query += ' AND object_name LIKE ?'
             params.append(f'%{object_name}%')
@@ -593,12 +579,10 @@ class EventSessionsDatabase(DatabaseManager):
         '''
         params = [session_id]
         
-        # Add object name filter if provided
         if object_name:
             query += ' AND object_name LIKE ?'
             params.append(f'%{object_name}%')
         
-        # Add object type filter if provided
         if object_type:
             query += ' AND object_type LIKE ?'
             params.append(f'%{object_type}%')
@@ -622,17 +606,14 @@ class EventSessionsDatabase(DatabaseManager):
             '''
             params = []
             
-            # Add object name filter if provided
             if object_name:
                 query += ' AND eo.object_name LIKE ?'
                 params.append(f'%{object_name}%')
             
-            # Add object type filter if provided
             if object_type:
                 query += ' AND eo.object_type LIKE ?'
                 params.append(f'%{object_type}%')
             
-            # Add ordering and pagination
             query += ' ORDER BY eo.timestamp DESC LIMIT ? OFFSET ?'
             params.extend([limit, offset])
             
@@ -697,7 +678,6 @@ class EventSessionsDatabase(DatabaseManager):
             List of photo records
         """
         try:
-            # Build query with filters
             query = '''
                 SELECT ep.id, ep.event_id, ep.object_name, ep.photo_path, 
                        ep.timestamp, ep.confidence,
@@ -708,7 +688,6 @@ class EventSessionsDatabase(DatabaseManager):
             '''
             params = []
             
-            # Add date filters
             if date_from:
                 query += ' AND DATE(es.start_time) >= DATE(?)'
                 params.append(date_from)
@@ -717,12 +696,10 @@ class EventSessionsDatabase(DatabaseManager):
                 query += ' AND DATE(es.start_time) <= DATE(?)'
                 params.append(date_to)
             
-            # Add object filter
             if object_name:
                 query += ' AND ep.object_name LIKE ?'
                 params.append(f'%{object_name}%')
             
-            # Add ordering and pagination
             query += ' ORDER BY ep.timestamp DESC LIMIT ? OFFSET ?'
             params.extend([limit, offset])
             
@@ -790,7 +767,6 @@ class EventSessionsDatabase(DatabaseManager):
             if not photo_ids:
                 return False
             
-            # Build placeholders for IN clause
             placeholders = ','.join(['?' for _ in photo_ids])
             
             query = f'DELETE FROM event_photos WHERE id IN ({placeholders})'
@@ -806,12 +782,10 @@ class EventSessionsDatabase(DatabaseManager):
     def delete_event_session(self, session_id: int) -> bool:
         """Delete an event session and all related photos, objects, and videos."""
         try:
-            # Delete related photos, objects, and videos first
             self.execute_update('DELETE FROM event_photos WHERE event_id = ?', (session_id,))
             self.execute_update('DELETE FROM event_objects WHERE event_id = ?', (session_id,))
             self.execute_update('DELETE FROM event_videos WHERE event_id = ?', (session_id,))
             
-            # Delete the session
             query = 'DELETE FROM event_sessions WHERE id = ?'
             affected = self.execute_update(query, (session_id,))
             return affected > 0
@@ -819,7 +793,6 @@ class EventSessionsDatabase(DatabaseManager):
             return False
 
 
-# Database factory functions
 def get_settings_db() -> SettingsDatabase:
     """Get settings database instance."""
     return SettingsDatabase()

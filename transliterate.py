@@ -18,7 +18,6 @@ def translit(char: str, source_lang: str = "ru", target_lang: str = "en") -> str
     Returns:
         Transliterated character
     """
-    # Russian to English transliteration mapping
     ru_to_en = {
         'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo',
         'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
@@ -33,11 +32,9 @@ def translit(char: str, source_lang: str = "ru", target_lang: str = "en") -> str
         'Ъ': '', 'Ы': 'Y', 'Ь': '', 'Э': 'E', 'Ю': 'Yu', 'Я': 'Ya'
     }
     
-    # Handle both lowercase and uppercase
     if char in ru_to_en:
         return ru_to_en[char]
     elif char.upper() in ru_to_en:
         return ru_to_en[char.upper()]
     else:
-        # Return original character if no transliteration found
         return char

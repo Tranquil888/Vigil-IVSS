@@ -19,8 +19,8 @@ class FaceDetector:
     
     def __init__(self):
         self.logger = get_recognition_logger()
-        self.algorithm = "cnn"  # Default algorithm
-        self.tolerance = 0.6  # Default tolerance
+        self.algorithm = "cnn"
+        self.tolerance = 0.6
         self.face_encodings = {}
         self.face_names = []
         self.model_path = ""
@@ -71,14 +71,12 @@ class FaceDetector:
                             self.face_encodings[name].append(encoding)
                         self.face_names = list(self.face_encodings.keys())
                         
-                        # Log details about loaded faces
                         for face_name in self.face_names:
                             encoding_count = len(self.face_encodings[face_name])
                             self.logger.info(f"Loaded {encoding_count} encodings for '{face_name}'")
                         
                         self.logger.info(f"Loaded old format with {len(self.face_names)} faces: {self.face_names}")
                     
-                    # Load additional settings if available
                     if "algorithm" in data:
                         self.algorithm = data["algorithm"]
                     if "tolerance" in data:
@@ -107,7 +105,6 @@ class FaceDetector:
             # Convert BGR to RGB for face_recognition library
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             
-            # Detect face locations
             face_locations = face_recognition.face_locations(
                 rgb_frame, 
                 model=self.algorithm
@@ -131,10 +128,8 @@ class FaceDetector:
             List of face encodings
         """
         try:
-            # Convert BGR to RGB
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             
-            # Get face encodings
             face_encodings = face_recognition.face_encodings(
                 rgb_frame, 
                 face_locations
@@ -161,25 +156,20 @@ class FaceDetector:
             tolerance = self.tolerance
             
         try:
-            # Detect faces
             face_locations = self.detect_faces(frame)
             
             if not face_locations:
                 return []
             
-            # Encode faces
             face_encodings = self.encode_faces(frame, face_locations)
             
-            # Debug: Log detection info
             self.logger.debug(f"Detected {len(face_locations)} faces, generated {len(face_encodings)} encodings")
             self.logger.debug(f"Known faces in database: {list(self.face_encodings.keys())}")
             self.logger.debug(f"Using tolerance: {tolerance}")
             
-            # Recognize faces
             recognized_faces = []
             
             for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
-                # Compare with known faces
                 # Handle both single encodings and multiple encodings per person
                 all_encodings = []
                 all_names = []
@@ -195,7 +185,6 @@ class FaceDetector:
                 self.logger.debug(f"Total known encodings: {len(all_encodings)}")
                 
                 if not all_encodings:
-                    # No known faces, add as unknown
                     recognized_faces.append({
                         'name': "Unknown",
                         'confidence': 0.0,
@@ -213,11 +202,9 @@ class FaceDetector:
                 name = "Unknown"
                 confidence = 0.0
                 
-                # Debug: Log comparison results
                 self.logger.debug(f"Matches: {matches}")
                 
                 if True in matches:
-                    # Find best match
                     face_distances = face_recognition.face_distance(
                         all_encodings,
                         face_encoding
@@ -228,13 +215,10 @@ class FaceDetector:
                         name = all_names[best_match_index]
                         confidence = 1.0 - face_distances[best_match_index]
                         
-                        # Debug: Log successful recognition
                         self.logger.debug(f"Recognized: {name} with confidence {confidence:.3f}, distance: {face_distances[best_match_index]:.3f}")
                     else:
-                        # Debug: Log failed recognition despite matches
                         self.logger.debug(f"Best match failed confidence check: distance={face_distances[best_match_index]:.3f}")
                 else:
-                    # Debug: Log no matches found
                     if len(all_encodings) > 0:
                         min_distance = np.min(face_recognition.face_distance(all_encodings, face_encoding))
                         self.logger.debug(f"No matches found. Best distance: {min_distance:.3f}")
@@ -269,10 +253,9 @@ class FaceDetector:
             for face in faces:
                 name = face['name']
                 confidence = face['confidence']
-                box = face['box']  # (x, y, w, h)
+                box = face['box']
                 x, y, w, h = box
                 
-                # Determine color based on recognition
                 if name == "Unknown":
                     color = (0, 0, 255)  # Red for unknown
                 elif confidence > 0.8:
@@ -282,18 +265,14 @@ class FaceDetector:
                 else:
                     color = (255, 0, 0)  # Blue for low confidence
                 
-                # Draw rectangle
                 cv2.rectangle(result_frame, (x, y), (x + w, y + h), color, 2)
                 
-                # Draw label
                 label = f"{name} ({confidence:.2f})" if name != "Unknown" else name
                 label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
                 
-                # Draw label background
                 cv2.rectangle(result_frame, (x, y - label_size[1] - 10), 
                             (x + label_size[0], y), color, -1)
                 
-                # Draw label text
                 cv2.putText(result_frame, label, (x, y - 5), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
             
@@ -365,7 +344,6 @@ class FaceDetector:
             if filename is None:
                 filename = self.model_path
             
-            # Ensure directory exists
             os.makedirs(os.path.dirname(filename), exist_ok=True)
             
             data = {
@@ -467,5 +445,4 @@ class FaceDetector:
             return False
 
 
-# Global face detector instance
 face_detector = FaceDetector()

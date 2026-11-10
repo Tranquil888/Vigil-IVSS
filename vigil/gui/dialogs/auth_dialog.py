@@ -25,19 +25,15 @@ class AuthenticationDialog:
         self.window.geometry("400x350")
         self.window.resizable(False, False)
         
-        # Center the dialog
         self._center_window()
         
-        # Make dialog modal
         self.window.transient(self.parent)
         self.window.grab_set()
         
         self._create_widgets()
         
-        # Focus on username entry
         self.username_entry.focus()
         
-        # Wait for dialog to close
         self.window.wait_window()
         
         return self.result
@@ -51,7 +47,6 @@ class AuthenticationDialog:
     
     def _create_widgets(self) -> None:
         """Create dialog widgets."""
-        # Title
         title_label = tk.Label(
             self.window,
             text="Vigil Surveillance System",
@@ -59,7 +54,6 @@ class AuthenticationDialog:
         )
         title_label.pack(pady=20)
         
-        # Subtitle
         subtitle_label = tk.Label(
             self.window,
             text="Please enter your credentials",
@@ -67,7 +61,6 @@ class AuthenticationDialog:
         )
         subtitle_label.pack(pady=5)
         
-        # Username frame
         username_frame = tk.Frame(self.window)
         username_frame.pack(pady=10, padx=20, fill='x')
         
@@ -75,7 +68,6 @@ class AuthenticationDialog:
         self.username_entry = tk.Entry(username_frame, font=("Arial", 10), width=30)
         self.username_entry.pack(fill='x', pady=5)
         
-        # Password frame
         password_frame = tk.Frame(self.window)
         password_frame.pack(pady=10, padx=20, fill='x')
         
@@ -83,10 +75,8 @@ class AuthenticationDialog:
         self.password_entry = tk.Entry(password_frame, font=("Arial", 10), width=30, show="*")
         self.password_entry.pack(fill='x', pady=5)
         
-        # Bind Enter key to login
         self.password_entry.bind('<Return>', lambda e: self._login())
         
-        # Buttons frame
         buttons_frame = tk.Frame(self.window)
         buttons_frame.pack(pady=25)
         
@@ -106,7 +96,6 @@ class AuthenticationDialog:
         )
         cancel_button.pack(side='left', padx=5)
         
-        # Status label
         self.status_label = tk.Label(
             self.window,
             text="",
@@ -124,13 +113,11 @@ class AuthenticationDialog:
             self.status_label.config(text="Please enter username and password")
             return
         
-        # Authenticate user
         success, message = auth_manager.authenticate(username, password)
         
         if success:
             self.logger.info(f"User '{username}' authenticated successfully")
             
-            # Get user role
             user = auth_manager.db.get_user(username)
             role = user.get('role', 'operator') if user else 'operator'
             
@@ -163,19 +150,15 @@ class CreateUserDialog:
         self.window.geometry("400x400")
         self.window.resizable(False, False)
         
-        # Center the dialog
         self._center_window()
         
-        # Make dialog modal
         self.window.transient(self.parent)
         self.window.grab_set()
         
         self._create_widgets()
         
-        # Focus on username entry
         self.username_entry.focus()
         
-        # Wait for dialog to close
         self.window.wait_window()
         
         return self.result
@@ -189,7 +172,6 @@ class CreateUserDialog:
     
     def _create_widgets(self) -> None:
         """Create dialog widgets."""
-        # Title
         title_label = tk.Label(
             self.window,
             text="Create New User",
@@ -197,7 +179,6 @@ class CreateUserDialog:
         )
         title_label.pack(pady=15)
         
-        # Username frame
         username_frame = tk.Frame(self.window)
         username_frame.pack(pady=8, padx=20, fill='x')
         
@@ -205,7 +186,6 @@ class CreateUserDialog:
         self.username_entry = tk.Entry(username_frame, font=("Arial", 10), width=30)
         self.username_entry.pack(fill='x', pady=3)
         
-        # Password frame
         password_frame = tk.Frame(self.window)
         password_frame.pack(pady=8, padx=20, fill='x')
         
@@ -213,7 +193,6 @@ class CreateUserDialog:
         self.password_entry = tk.Entry(password_frame, font=("Arial", 10), width=30, show="*")
         self.password_entry.pack(fill='x', pady=3)
         
-        # Confirm password frame
         confirm_frame = tk.Frame(self.window)
         confirm_frame.pack(pady=8, padx=20, fill='x')
         
@@ -221,7 +200,6 @@ class CreateUserDialog:
         self.confirm_entry = tk.Entry(confirm_frame, font=("Arial", 10), width=30, show="*")
         self.confirm_entry.pack(fill='x', pady=3)
         
-        # Role frame
         role_frame = tk.Frame(self.window)
         role_frame.pack(pady=8, padx=20, fill='x')
         
@@ -236,7 +214,6 @@ class CreateUserDialog:
         )
         role_combo.pack(fill='x', pady=3)
         
-        # Buttons frame
         buttons_frame = tk.Frame(self.window)
         buttons_frame.pack(pady=20)
         
@@ -256,7 +233,6 @@ class CreateUserDialog:
         )
         cancel_button.pack(side='left', padx=5)
         
-        # Status label
         self.status_label = tk.Label(
             self.window,
             text="",
@@ -272,7 +248,6 @@ class CreateUserDialog:
         confirm = self.confirm_entry.get()
         role = self.role_var.get()
         
-        # Validation
         if not username or not password or not confirm:
             self.status_label.config(text="All fields are required")
             return
@@ -281,7 +256,6 @@ class CreateUserDialog:
             self.status_label.config(text="Passwords do not match")
             return
         
-        # Create user
         success, message = auth_manager.create_user(username, password, role)
         
         if success:

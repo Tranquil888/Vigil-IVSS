@@ -22,7 +22,7 @@ class FaceTrainer:
     def __init__(self):
         self.logger = get_recognition_logger()
         self.dataset_manager = DatasetManager()
-        self.algorithm = "cnn"  # Default algorithm
+        self.algorithm = "cnn"
         self.tolerance = 0.6
         self.is_training = False
         self.progress_callback: Optional[Callable] = None
@@ -84,19 +84,15 @@ class FaceTrainer:
             self.is_training = True
             self.logger.info("Starting face recognition model training")
             
-            # Validate dataset
             validation_result = self.validate_dataset(dataset_path)
             if not validation_result['valid']:
                 raise TrainingError(f"Invalid dataset: {validation_result['errors']}")
             
-            # Set default output path
             if output_path is None:
                 output_path = os.path.join(os.getcwd(), "data", "encodings.pickle")
             
-            # Ensure output directory exists
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             
-            # Get all image paths
             image_paths = list(paths.list_images(dataset_path))
             total_images = len(image_paths)
             
@@ -106,21 +102,17 @@ class FaceTrainer:
             self.logger.info(f"Found {total_images} training images")
             self._update_progress(0, total_images, "Starting training...")
             
-            # Initialize encodings and names lists
             known_encodings = []
             known_names = []
             
-            # Process each image
             start_time = time.time()
             processed_count = 0
             
             for i, image_path in enumerate(image_paths):
                 try:
-                    # Update progress
                     progress_message = f"Processing {os.path.basename(image_path)}"
                     self._update_progress(i, total_images, progress_message)
                     
-                    # Load image and extract name from path
                     image = cv2.imread(image_path)
                     if image is None:
                         self.logger.warning(f"Could not read image: {image_path}")
@@ -128,7 +120,6 @@ class FaceTrainer:
                     
                     # Extract name from directory structure (remove prefix if present)
                     name = os.path.basename(os.path.dirname(image_path))
-                    # Remove common prefixes if present
                     if name.startswith("_"):
                         name = name[13:] if len(name) > 13 else name
                     elif name.startswith("dataset_"):
@@ -136,18 +127,14 @@ class FaceTrainer:
                     elif name.startswith("user_"):
                         name = name[5:]   # Remove "user_" prefix
                     
-                    # Clean up name
                     name = name.strip().replace("_", " ").title()
                     
                     self.logger.debug(f"Processing image for person: '{name}' (original: '{os.path.basename(os.path.dirname(image_path))}')")
                     
-                    # Convert BGR to RGB
                     rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                     
-                    # Detect face locations
                     boxes = face_recognition.face_locations(rgb, model=self.algorithm)
                     
-                    # Generate face encodings
                     for encoding in face_recognition.face_encodings(rgb, boxes):
                         known_encodings.append(encoding)
                         known_names.append(name)
@@ -159,11 +146,9 @@ class FaceTrainer:
                     self.logger.error(f"Error processing image {image_path}: {e}")
                     continue
             
-            # Check if any faces were found
             if len(known_encodings) == 0:
                 raise TrainingError("No faces found in training images")
             
-            # Create training data
             training_data = {
                 'encodings': known_encodings,
                 'names': known_names,
@@ -175,11 +160,9 @@ class FaceTrainer:
                 'unique_faces': len(set(known_names))
             }
             
-            # Save training data
             with open(output_path, 'wb') as f:
                 f.write(pickle.dumps(training_data))
             
-            # Calculate training statistics
             end_time = time.time()
             training_time = end_time - start_time
             
@@ -223,7 +206,6 @@ class FaceTrainer:
             with open(model_path, 'rb') as f:
                 data = pickle.loads(f.read())
             
-            # Validate model structure
             if 'encodings' not in data or 'names' not in data:
                 raise ValueError("Invalid model structure: missing encodings or names")
             
@@ -260,5 +242,4 @@ class FaceTrainer:
             return False
 
 
-# Global face trainer instance
 face_trainer = FaceTrainer()

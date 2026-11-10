@@ -19,36 +19,23 @@ class AuthorizationManager:
         """Setup role permissions mapping."""
         self.permissions = {
             ROLE_ADMIN: {
-                # User management
                 'create_user', 'delete_user', 'view_users', 'edit_user', 'view_user_list',
-                # Object management
                 'create_object', 'delete_object', 'edit_object', 'view_objects',
                 'train_model', 'view_dataset',
-                # Camera management
                 'add_camera', 'edit_camera', 'delete_camera', 'view_cameras',
-                # System settings
                 'edit_settings', 'view_settings',
-                # Video operations
                 'start_recording', 'stop_recording', 'view_video',
                 'start_streaming', 'stop_streaming',
-                # Event management
                 'view_events', 'export_events', 'delete_events',
-                # Full access
                 'admin_access'
             },
             ROLE_OPERATOR: {
-                # Limited user management
                 'view_users', 'view_user_list',
-                # Limited object management
                 'view_objects', 'edit_object',
-                # Camera viewing only
                 'view_cameras',
-                # Video operations
                 'start_recording', 'stop_recording', 'view_video',
                 'start_streaming', 'stop_streaming',
-                # Event management
                 'view_events', 'export_events',
-                # No user management or system settings
             }
         }
     
@@ -124,5 +111,4 @@ class AuthorizationManager:
         return self.has_permission(user_role, 'view_user_list')
 
 
-# Global authorization instance
 authz_manager = AuthorizationManager()

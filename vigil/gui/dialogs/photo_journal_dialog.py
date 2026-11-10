@@ -15,7 +15,6 @@ from vigil.gui.dialogs.person_selection_dialog import PersonSelectionDialog
 from vigil.utils.dataset_manager import DatasetManager
 from vigil.config.constants import get_data_dir
 
-
 class PhotoJournalDialog:
     """Dialog for viewing and managing all captured photos."""
     
@@ -33,56 +32,45 @@ class PhotoJournalDialog:
         self.db = get_events_db()
         self.dataset_manager = DatasetManager()
         
-        # Create dialog window
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Photo Journal")
         self.dialog.geometry("1400x900")
         
-        # Make window resizable
         self.dialog.resizable(True, True)
         self.dialog.minsize(1000, 700)
         
-        # State
         self.current_photos = []
         self.photo_thumbnails = []
-        self.selected_photos = set()  # Track selected photos
+        self.selected_photos = set()
         self.current_offset = 0
         self.photos_per_page = 100
         
-        # Filter state
         self.date_from_var = tk.StringVar()
         self.date_to_var = tk.StringVar()
         self.object_name_var = tk.StringVar()
         self.status_var = tk.StringVar(value="Ready")
         
-        # Create UI
         self._create_widgets()
         self._load_available_dates()
         self._load_photos()
         
-        # Handle window closing
         self.dialog.protocol("WM_DELETE_WINDOW", self._on_closing)
         
-        # Make dialog transient to main window
         self.dialog.transient(self.parent)
         self.dialog.grab_set()
     
     def _create_widgets(self) -> None:
         """Create dialog widgets."""
-        # Main container
         main_container = ttk.Frame(self.dialog)
         main_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # Title
         title_label = ttk.Label(main_container, text="Photo Journal", 
                               font=('Arial', 16, 'bold'))
         title_label.pack(pady=(0, 20))
         
-        # Filter controls frame
         filter_frame = ttk.LabelFrame(main_container, text="Filters", padding="10")
         filter_frame.pack(fill=tk.X, pady=(0, 20))
         
-        # Date filters
         date_frame = ttk.Frame(filter_frame)
         date_frame.pack(fill=tk.X, pady=(0, 10))
         
@@ -94,7 +82,6 @@ class PhotoJournalDialog:
         self.date_to_combo = ttk.Combobox(date_frame, textvariable=self.date_to_var, width=15)
         self.date_to_combo.pack(side=tk.LEFT, padx=(0, 20))
         
-        # Object filters
         object_frame = ttk.Frame(filter_frame)
         object_frame.pack(fill=tk.X, pady=(0, 10))
         
@@ -102,7 +89,6 @@ class PhotoJournalDialog:
         self.object_name_entry = ttk.Entry(object_frame, textvariable=self.object_name_var, width=20)
         self.object_name_entry.pack(side=tk.LEFT, padx=(0, 20))
         
-        # Filter buttons
         button_frame = ttk.Frame(filter_frame)
         button_frame.pack(fill=tk.X, pady=(10, 0))
         
@@ -113,7 +99,6 @@ class PhotoJournalDialog:
         ttk.Button(button_frame, text="Refresh", 
                  command=self._load_photos).pack(side=tk.LEFT, padx=(0, 5))
         
-        # Management buttons
         manage_frame = ttk.Frame(filter_frame)
         manage_frame.pack(fill=tk.X, pady=(10, 0))
         
@@ -129,25 +114,21 @@ class PhotoJournalDialog:
         photo_container = ttk.Frame(main_container)
         photo_container.pack(fill=tk.BOTH, expand=True, pady=(20, 0))
         
-        # Configure photo container to use 85% of space
         photo_container.grid_rowconfigure(0, weight=1)
         photo_container.grid_columnconfigure(0, weight=1)
         
         self._create_photo_area(photo_container)
         
-        # Status bar
         status_frame = ttk.Frame(main_container)
         status_frame.pack(fill=tk.X, pady=(10, 0))
         
         ttk.Label(status_frame, text="Status:").pack(side=tk.LEFT, padx=(0, 5))
         ttk.Label(status_frame, textvariable=self.status_var).pack(side=tk.LEFT)
         
-        # Pagination controls
         self._create_pagination_controls(main_container)
     
     def _create_photo_area(self, parent) -> None:
         """Create scrollable area for photo display."""
-        # Canvas with scrollbar using grid layout
         canvas_frame = ttk.Frame(parent)
         canvas_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=5, pady=5)
         
@@ -161,11 +142,9 @@ class PhotoJournalDialog:
         self.photos_canvas.configure(yscrollcommand=scrollbar.set)
         scrollbar.configure(command=self.photos_canvas.yview)
         
-        # Inner frame for photos
         self.photos_frame_inner = ttk.Frame(self.photos_canvas)
         self.photos_canvas.create_window((0, 0), window=self.photos_frame_inner, anchor='nw')
         
-        # Bind configure events
         self.photos_frame_inner.bind('<Configure>', self._on_photos_frame_configure)
         self.photos_canvas.bind('<Configure>', self._on_photos_canvas_configure)
     
@@ -193,14 +172,11 @@ class PhotoJournalDialog:
         try:
             dates = self.db.get_available_dates()
             
-            # Add "All" option at the beginning
             all_dates = ["All"] + dates
             
-            # Update dropdowns
             self.date_from_combo['values'] = all_dates
             self.date_to_combo['values'] = all_dates
             
-            # Set default values
             self.date_from_var.set("All")
             self.date_to_var.set("All")
             
@@ -210,11 +186,9 @@ class PhotoJournalDialog:
     def _load_photos(self) -> None:
         """Load photos with current filters."""
         try:
-            # Get photos from database
             date_from = self.date_from_var.get()
             date_to = self.date_to_var.get()
             
-            # Handle "All" option for dates
             date_from = None if date_from == "All" else date_from
             date_to = None if date_to == "All" else date_to
             
@@ -230,7 +204,6 @@ class PhotoJournalDialog:
             self._display_photos()
             self._update_pagination()
             
-            # Update status
             filter_status = self._get_filter_status()
             self.status_var.set(f"Loaded {len(photos)} photos{filter_status}")
             
@@ -240,18 +213,15 @@ class PhotoJournalDialog:
     
     def _display_photos(self) -> None:
         """Display photos in the grid layout."""
-        # Clear existing photos
         for widget in self.photos_frame_inner.winfo_children():
             widget.destroy()
         self.photo_thumbnails.clear()
         
         if not self.current_photos:
-            # Show no photos message
             ttk.Label(self.photos_frame_inner, text="No photos found", 
                      font=('Arial', 12)).pack(pady=50)
             return
         
-        # Create photo thumbnails
         for i, photo in enumerate(self.current_photos):
             self._create_photo_thumbnail(photo, i)
     
@@ -264,7 +234,6 @@ class PhotoJournalDialog:
                 self.logger.warning(f"Photo file not found: {photo_path}")
                 return
             
-            # Load and resize image
             image = Image.open(photo_path)
             image.thumbnail((150, 150), Image.Resampling.LANCZOS)
             photo = ImageTk.PhotoImage(image)
@@ -272,27 +241,22 @@ class PhotoJournalDialog:
             # Store reference
             self.photo_thumbnails.append(photo)
             
-            # Calculate grid position dynamically based on window width
             cols = self._calculate_photo_columns()
             row = index // cols
             col = index % cols
             
-            # Create frame for photo
             photo_frame = ttk.Frame(self.photos_frame_inner, relief=tk.RAISED, borderwidth=1)
             photo_frame.grid(row=row, column=col, padx=10, pady=10, sticky=(tk.W, tk.E, tk.N, tk.S))
             
-            # Selection checkbox
             selected_var = tk.BooleanVar(value=(photo_path in self.selected_photos))
             checkbox = ttk.Checkbutton(photo_frame, variable=selected_var,
                                    command=lambda p=photo_path, v=selected_var: self._on_photo_selection(p, v))
             checkbox.pack(pady=(0, 5))
             
-            # Photo label with click binding
             photo_label = ttk.Label(photo_frame, image=photo)
             photo_label.pack(pady=(0, 5))
             photo_label.bind('<Button-1>', lambda e, p=photo_path: self._on_photo_click(e, p))
             
-            # Info label
             info_text = f"{photo_data['object_name']}\n{photo_data['timestamp']}"
             info_label = ttk.Label(photo_frame, text=info_text, font=('Arial', 8), wraplength=140)
             info_label.pack(pady=(0, 5))
@@ -303,25 +267,22 @@ class PhotoJournalDialog:
     def _calculate_photo_columns(self) -> int:
         """Calculate optimal number of photo columns based on canvas width."""
         try:
-            # Get current canvas width
             canvas_width = self.photos_canvas.winfo_width()
             
             # Minimum width per photo (including padding)
             min_photo_width = 180  # 150px image + 30px padding
             
-            # Calculate columns, ensuring at least 2 and max 6
             if canvas_width > 1:  # Valid width
                 cols = max(2, min(6, canvas_width // min_photo_width))
             else:
-                cols = 4  # Default fallback
+                cols = 4
             
             return cols
         except:
-            return 4  # Default fallback
+            return 4
     
     def _on_photo_click(self, event, photo_path: str) -> None:
         """Handle photo click for selection."""
-        # Toggle selection
         if photo_path in self.selected_photos:
             self.selected_photos.remove(photo_path)
         else:
@@ -342,16 +303,14 @@ class PhotoJournalDialog:
         """Update UI state based on photo selection."""
         has_selection = len(self.selected_photos) > 0
         
-        # Update button states
         self.delete_button.config(state="normal" if has_selection else "disabled")
         self.add_to_dataset_button.config(state="normal" if has_selection else "disabled")
         
-        # Update status
         self.status_var.set(f"Selected {len(self.selected_photos)} photo(s)")
     
     def _apply_filters(self) -> None:
         """Apply current filters and reload photos."""
-        self.current_offset = 0  # Reset to first page
+        self.current_offset = 0
         self._load_photos()
     
     def _clear_filters(self) -> None:
@@ -386,22 +345,18 @@ class PhotoJournalDialog:
             messagebox.showwarning("No Selection", "Please select photos to delete.")
             return
         
-        # Confirm deletion
         result = messagebox.askyesno("Confirm Delete", 
                                    f"Delete {len(self.selected_photos)} selected photo(s)?\n\nThis action cannot be undone.")
         if not result:
             return
         
         try:
-            # Get photo IDs for deletion
             photo_ids = []
             for photo in self.current_photos:
                 if photo['photo_path'] in self.selected_photos:
                     photo_ids.append(photo['id'])
             
-            # Delete from database
             if self.db.delete_photos(photo_ids):
-                # Delete from filesystem
                 deleted_count = 0
                 for photo_path in self.selected_photos:
                     try:
@@ -411,7 +366,6 @@ class PhotoJournalDialog:
                     except Exception as e:
                         self.logger.error(f"Error deleting photo file {photo_path}: {e}")
                 
-                # Clear selection and reload
                 self.selected_photos.clear()
                 self._load_photos()
                 
@@ -431,7 +385,6 @@ class PhotoJournalDialog:
             return
         
         try:
-            # Show person selection dialog
             dataset_path = os.path.join(get_data_dir(), 'dataset')
             person_dialog = PersonSelectionDialog(self.dialog, dataset_path)
             selected_person = person_dialog.show()
@@ -439,7 +392,6 @@ class PhotoJournalDialog:
             if not selected_person:
                 return  # User cancelled
             
-            # Add photos to dataset
             success_count = 0
             import time
             for i, photo_path in enumerate(self.selected_photos):
@@ -454,11 +406,9 @@ class PhotoJournalDialog:
                 messagebox.showinfo("Success", 
                                  f"Added {success_count} photo(s) to {selected_person}'s dataset.")
                 
-                # Clear selection and reload
                 self.selected_photos.clear()
                 self._load_photos()
                 
-                # Ask about training
                 result = messagebox.askyesno("Retrain Model", 
                                            "Would you like to retrain the face recognition model?")
                 if result:
@@ -481,7 +431,6 @@ class PhotoJournalDialog:
                                        "Model training is already in progress.")
                     return
                 
-                # Start training
                 success = training_service.start_training()
                 if success:
                     self.status_var.set("Model training started...")
@@ -510,52 +459,42 @@ class PhotoJournalDialog:
     
     def _update_pagination(self) -> None:
         """Update pagination controls."""
-        # Calculate page info
         current_page = (self.current_offset // self.photos_per_page) + 1
         total_photos = len(self.current_photos)
         
-        # Update page label
         if total_photos > 0:
             self.page_label.config(text=f"Page {current_page}")
         else:
             self.page_label.config(text="No photos")
         
-        # Update button states
         self.prev_button.config(state="normal" if self.current_offset > 0 else "disabled")
         self.next_button.config(state="normal" if total_photos == self.photos_per_page else "disabled")
         
-        # Update total count (simplified - would need separate query for total count)
+        # Total count needs a separate query; show the loaded page.
         self.total_label.config(text=f"Showing {total_photos} photos")
     
     def _on_photos_frame_configure(self, event) -> None:
         """Handle photos frame configure event."""
-        # Update scroll region
         self.photos_canvas.configure(scrollregion=self.photos_canvas.bbox('all'))
     
     def _on_photos_canvas_configure(self, event) -> None:
         """Handle canvas resize - refresh photo layout."""
-        # Update canvas width
         canvas_width = event.width
         if canvas_width > 1:
-            # Calculate optimal columns based on width
             min_photo_width = 180  # 150px image + 30px padding
             cols = max(2, min(6, canvas_width // min_photo_width))
             
-            # Update grid columns
             for i in range(cols):
                 self.photos_frame_inner.columnconfigure(i, weight=1, minsize=170)
             
-            # Update canvas window width to fill available space
             canvas_items = self.photos_canvas.find_all()
             if canvas_items:
                 self.photos_canvas.itemconfig(canvas_items[0], width=canvas_width)
             
-            # Refresh photo layout to adapt to new width
             self._display_photos()
     
     def _on_closing(self) -> None:
         """Handle dialog closing."""
-        # Release grab and destroy dialog
         self.dialog.grab_release()
         self.dialog.destroy()
     

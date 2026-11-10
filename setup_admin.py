@@ -8,7 +8,6 @@ import sys
 import os
 import hashlib
 
-# Add the project root to Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from vigil.database.manager import AuthenticationDatabase
@@ -23,10 +22,8 @@ def create_admin_user():
     print()
     
     try:
-        # Initialize database
         auth_db = AuthenticationDatabase()
         
-        # Check if users already exist
         users = auth_db.get_all_users()
         if users:
             print(f"Found {len(users)} existing users:")
@@ -39,7 +36,6 @@ def create_admin_user():
                 print("Setup cancelled.")
                 return
         
-        # Get admin credentials
         print("Create Administrator Account")
         print("-" * 30)
         
@@ -68,10 +64,8 @@ def create_admin_user():
             else:
                 print("Password is required.")
         
-        # Hash password
         password_hash = hashlib.sha256(password.encode()).hexdigest()
         
-        # Create admin user
         success = auth_db.create_user(username, password_hash, 'admin')
         
         if success:

@@ -41,18 +41,14 @@ class PersonSelectionDialog:
         self.dialog.transient(self.parent)
         self.dialog.grab_set()
         
-        # Center dialog
         self._center_dialog()
         
-        # Main frame
         main_frame = ttk.Frame(self.dialog, padding="20")
         main_frame.pack(fill=tk.BOTH, expand=True)
         
-        # Title
         ttk.Label(main_frame, text="Select Person for Dataset", 
                  font=('Arial', 12, 'bold')).pack(pady=(0, 20))
         
-        # Existing person selection
         ttk.Label(main_frame, text="Existing Person:").pack(anchor=tk.W)
         
         self.person_var = tk.StringVar()
@@ -61,7 +57,6 @@ class PersonSelectionDialog:
         self.person_combo.pack(pady=(5, 15), fill=tk.X)
         self.person_combo.bind('<<ComboboxSelected>>', self._on_person_selected)
         
-        # Or create new person
         ttk.Label(main_frame, text="Or Create New Person:").pack(anchor=tk.W)
         
         self.new_person_var = tk.StringVar()
@@ -70,7 +65,6 @@ class PersonSelectionDialog:
         self.new_person_entry.pack(pady=(5, 20), fill=tk.X)
         self.new_person_entry.bind('<KeyRelease>', self._on_new_person_typing)
         
-        # Buttons
         button_frame = ttk.Frame(main_frame)
         button_frame.pack(fill=tk.X, pady=(10, 0))
         
@@ -81,7 +75,6 @@ class PersonSelectionDialog:
         ttk.Button(button_frame, text="Cancel", 
                  command=self._on_cancel).pack(side=tk.RIGHT)
         
-        # Bind Enter key
         self.dialog.bind('<Return>', lambda e: self._on_select())
         self.dialog.bind('<Escape>', lambda e: self._on_cancel())
     
@@ -120,7 +113,7 @@ class PersonSelectionDialog:
         """Handle person selection from combo box."""
         selection = self.person_var.get()
         if selection and selection != "No existing people" and selection != "Error loading people":
-            self.new_person_var.set("")  # Clear new person entry
+            self.new_person_var.set("")
             self.select_button.config(state="normal")
         else:
             self.select_button.config(state="disabled")
@@ -130,10 +123,9 @@ class PersonSelectionDialog:
         new_person = self.new_person_var.get().strip()
         
         if new_person:
-            self.person_var.set("")  # Clear combo selection
+            self.person_var.set("")
             self.select_button.config(state="normal")
         else:
-            # Check if combo has valid selection
             selection = self.person_var.get()
             if selection and selection != "No existing people" and selection != "Error loading people":
                 self.select_button.config(state="normal")
@@ -142,14 +134,12 @@ class PersonSelectionDialog:
     
     def _on_select(self) -> None:
         """Handle select button click."""
-        # Check for existing person selection
         selection = self.person_var.get()
         if selection and selection != "No existing people" and selection != "Error loading people":
             self.selected_person = selection.strip()
             self.dialog.destroy()
             return
         
-        # Check for new person
         new_person = self.new_person_var.get().strip()
         if new_person:
             self.selected_person = new_person

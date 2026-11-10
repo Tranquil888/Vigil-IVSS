@@ -26,7 +26,6 @@ class VideoCapture:
         self.height = 0
         self.frame_count = 0
         
-        # Video file tracking
         self.is_video_file = False
         self.total_frames = 0
         self.current_frame = 0
@@ -38,13 +37,11 @@ class VideoCapture:
         self.last_fps_calc_time = 0
         self.frames_since_last_calc = 0
         
-        # Load camera settings
         self._load_camera_settings()
     
     def _load_camera_settings(self) -> None:
         """Load camera configuration from settings."""
         try:
-            # Get default camera settings
             self.default_camera = "channel_01"
             camera_info = self._get_camera_info(self.default_camera)
             
@@ -86,7 +83,6 @@ class VideoCapture:
             if self.cap and self.cap.isOpened():
                 self.close_source()
             
-            # Determine source type and open accordingly
             self.is_video_file = False
             if isinstance(source, str) and source.startswith(('http://', 'https://', 'rtsp://')):
                 # IP camera or stream
@@ -110,7 +106,6 @@ class VideoCapture:
             if not self.cap.isOpened():
                 raise CameraError(f"Failed to open video source: {source}")
             
-            # Get video properties
             self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             self.fps = self.cap.get(cv2.CAP_PROP_FPS)
@@ -118,12 +113,10 @@ class VideoCapture:
             if self.fps <= 0:
                 self.fps = 30  # Default FPS
             
-            # Get total frame count for video files
             if self.is_video_file:
                 self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
                 self.current_frame = 0
                 
-                # Calculate video duration for debugging
                 duration_seconds = self.total_frames / self.fps if self.fps > 0 else 0
                 self.logger.info(f"Video info: {self.total_frames} frames, {self.fps:.2f} FPS, {duration_seconds:.2f} seconds duration")
             else:
@@ -169,7 +162,6 @@ class VideoCapture:
         self.is_running = True
         self.frame_count = 0
         
-        # Start capture thread
         self.capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
         self.capture_thread.start()
         
@@ -195,23 +187,19 @@ class VideoCapture:
         """Main capture loop running in separate thread."""
         last_frame_time = time.time()
         
-        # Get FPS setting from settings database
         try:
             max_fps = int(settings.get_setting('camera_max_fps', '30'))
         except (ValueError, TypeError):
             max_fps = 30
         
-        # Get video playback settings
         loop_playback = settings.get_setting('video_loop_playback', '0') == '1'
         video_speed_multiplier = float(settings.get_setting('video_playback_speed', '1.0'))
         
         # For video files, calculate frame skipping to reduce CPU load based on resolution and FPS
         if self.is_video_file:
             native_fps = self.fps if self.fps > 0 else 30.0
-            # Calculate resolution-based frame skipping
             total_pixels = self.width * self.height
             
-            # Adaptive frame skipping based on resolution and FPS
             if total_pixels > 1280 * 720:  # HD and above
                 if native_fps > 30:
                     self.frame_skip = 3  # Process every 4th frame
@@ -236,7 +224,6 @@ class VideoCapture:
             self.logger.info(f"Video frame skipping: Resolution={self.width}x{self.height}, Native FPS={native_fps}, Skip every {self.frame_skip + 1} frames")
             
             # Apply speed multiplier using OpenCV's playback speed property
-            # This is the correct way to control video playback speed
             if self.cap and hasattr(self.cap, 'set'):
                 # OpenCV v4.5+ supports CAP_PROP_POS_MSEC for better timing
                 # For now, we'll use frame skipping approach
@@ -270,13 +257,11 @@ class VideoCapture:
                         self.logger.info("End of video file reached")
                         
                         if loop_playback and self.is_running:
-                            # Reset video to beginning
                             self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                             self.current_frame = 0
                             self.logger.info("Looping video playback")
                             continue
                         else:
-                            # Video ended, stop capture
                             self.logger.info("Video file completed, stopping capture")
                             break
                     else:
@@ -290,9 +275,7 @@ class VideoCapture:
                 if self.is_video_file:
                     self.frame_counter += 1
                     
-                    # Apply frame skipping to reduce CPU load
                     if self.frame_counter % (self.frame_skip + 1) == 0:
-                        # Process video frame with proper timing
                         if self.frame_callback:
                             self.frame_callback(frame)
                         
@@ -300,7 +283,6 @@ class VideoCapture:
                         self.frames_since_last_calc += 1
                         self.current_frame += 1
                         
-                        # Calculate actual FPS every second
                         current_time = time.time()
                         if self.last_fps_calc_time == 0:
                             self.last_fps_calc_time = current_time
@@ -332,7 +314,6 @@ class VideoCapture:
                         self.current_frame += 1
                         last_frame_time = current_time
                         
-                        # Calculate actual FPS every second
                         if self.last_fps_calc_time == 0:
                             self.last_fps_calc_time = current_time
                         elif current_time - self.last_fps_calc_time >= 1.0:
@@ -392,7 +373,6 @@ class VideoCapture:
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
             
-            # Update stored dimensions
             self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             
@@ -466,5 +446,4 @@ class VideoCapture:
             return False
 
 
-# Global video capture instance
 video_capture = VideoCapture()

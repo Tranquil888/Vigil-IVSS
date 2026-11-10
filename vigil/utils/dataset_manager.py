@@ -38,7 +38,6 @@ class DatasetManager:
         }
         
         try:
-            # Check if dataset directory exists
             if not os.path.exists(dataset_path):
                 result['errors'].append(f"Dataset directory does not exist: {dataset_path}")
                 return result
@@ -47,7 +46,6 @@ class DatasetManager:
                 result['errors'].append(f"Dataset path is not a directory: {dataset_path}")
                 return result
             
-            # Get all subdirectories (person folders)
             person_dirs = []
             for item in os.listdir(dataset_path):
                 item_path = os.path.join(dataset_path, item)
@@ -58,7 +56,6 @@ class DatasetManager:
                 result['errors'].append("No person directories found in dataset")
                 return result
             
-            # Validate each person directory
             total_images = 0
             valid_images = 0
             person_stats = {}
@@ -70,11 +67,9 @@ class DatasetManager:
                 for file in os.listdir(person_path):
                     file_path = os.path.join(person_path, file)
                     if os.path.isfile(file_path):
-                        # Check file extension
                         _, ext = os.path.splitext(file.lower())
                         if ext in self.supported_formats:
                             try:
-                                # Try to open image to validate it
                                 with Image.open(file_path) as img:
                                     img.verify()
                                 images.append(file)
@@ -94,7 +89,6 @@ class DatasetManager:
                         'images': images
                     }
             
-            # Set validation results
             result['valid'] = len(result['errors']) == 0 and valid_images > 0
             result['statistics'] = {
                 'total_persons': len(person_dirs),
@@ -126,13 +120,11 @@ class DatasetManager:
             validation_result = self.validate_dataset(dataset_path)
             stats = validation_result.get('statistics', {})
             
-            # Calculate additional statistics
             if stats.get('valid_images', 0) > 0:
                 stats['images_per_person'] = stats['valid_images'] / max(stats['persons_with_images'], 1)
             else:
                 stats['images_per_person'] = 0
             
-            # Get directory size
             total_size = 0
             for dirpath, dirnames, filenames in os.walk(dataset_path):
                 for filename in filenames:
@@ -184,15 +176,12 @@ class DatasetManager:
             True if successful, False otherwise
         """
         try:
-            # Validate image
             with Image.open(image_path) as img:
                 img.verify()
             
-            # Create person directory if it doesn't exist
             person_path = os.path.join(dataset_path, person_name)
             os.makedirs(person_path, exist_ok=True)
             
-            # Generate unique filename
             _, ext = os.path.splitext(image_path)
             
             # Use original filename with timestamp to ensure uniqueness
@@ -201,7 +190,6 @@ class DatasetManager:
             filename = f"{person_name}_{timestamp}_{original_name}{ext}"
             dest_path = os.path.join(person_path, filename)
             
-            # Copy image
             shutil.copy2(image_path, dest_path)
             self.logger.info(f"Added training image: {dest_path}")
             return True
@@ -230,7 +218,6 @@ class DatasetManager:
                 
                 # Check if it's a directory and not hidden
                 if os.path.isdir(item_path) and not item.startswith('.'):
-                    # Check if directory contains image files
                     has_images = False
                     for file in os.listdir(item_path):
                         if any(file.lower().endswith(ext) for ext in self.supported_formats):
@@ -240,7 +227,7 @@ class DatasetManager:
                     if has_images:
                         people.append(item)
             
-            people.sort()  # Sort alphabetically
+            people.sort()
             return people
             
         except Exception as e:
@@ -319,24 +306,20 @@ class DatasetManager:
             True if successful, False otherwise
         """
         try:
-            # Create main dataset directory
             os.makedirs(base_path, exist_ok=True)
             
-            # Create sample person directories
             sample_persons = ['person_01', 'person_02', 'person_03']
             
             for person in sample_persons:
                 person_path = os.path.join(base_path, person)
                 os.makedirs(person_path, exist_ok=True)
                 
-                # Create a README file in each directory
                 readme_path = os.path.join(person_path, 'README.txt')
                 with open(readme_path, 'w') as f:
                     f.write(f"Add training images for {person} in this directory.\n")
                     f.write("Supported formats: .jpg, .jpeg, .png, .bmp, .tiff\n")
                     f.write("Images should contain clear frontal views of the person's face.\n")
             
-            # Create main README
             readme_path = os.path.join(base_path, 'README.txt')
             with open(readme_path, 'w') as f:
                 f.write("Vigil Face Recognition Dataset\n")
@@ -407,29 +390,24 @@ class DatasetManager:
             Path to saved face image, or None if failed
         """
         try:
-            # Extract face coordinates
             top, right, bottom, left = face_location
             
-            # Add padding around the face
             padding = 20
             top = max(0, top - padding)
             left = max(0, left - padding)
             bottom = min(frame.shape[0], bottom + padding)
             right = min(frame.shape[1], right + padding)
             
-            # Extract face ROI
             face_roi = frame[top:bottom, left:right]
             
             if face_roi.size == 0:
                 self.logger.warning("Empty face ROI detected")
                 return None
             
-            # Create captured faces directory structure
             base_dir = os.path.join(os.getcwd(), 'data', 'captured_faces')
             object_dir = os.path.join(base_dir, self._sanitize_filename(object_name))
             os.makedirs(object_dir, exist_ok=True)
             
-            # Generate filename with timestamp
             timestamp = int(time.time())
             filename = f"{timestamp}_{self._sanitize_filename(object_name)}.jpg"
             filepath = os.path.join(object_dir, filename)
@@ -437,7 +415,6 @@ class DatasetManager:
             # Convert BGR to RGB for PIL
             face_rgb = cv2.cvtColor(face_roi, cv2.COLOR_BGR2RGB)
             
-            # Save face image
             pil_image = Image.fromarray(face_rgb)
             pil_image.save(filepath, 'JPEG', quality=85)
             
@@ -491,14 +468,12 @@ class DatasetManager:
             counts = {}
             
             if object_name:
-                # Get count for specific object
                 object_dir = os.path.join(base_dir, self._sanitize_filename(object_name))
                 if os.path.exists(object_dir):
                     files = [f for f in os.listdir(object_dir) 
                             if os.path.isfile(os.path.join(object_dir, f))]
                     counts[object_name] = len(files)
             else:
-                # Get counts for all objects
                 for item in os.listdir(base_dir):
                     object_dir = os.path.join(base_dir, item)
                     if os.path.isdir(object_dir):
@@ -538,7 +513,6 @@ class DatasetManager:
                     for filename in os.listdir(object_dir):
                         file_path = os.path.join(object_dir, filename)
                         if os.path.isfile(file_path):
-                            # Extract timestamp from filename
                             try:
                                 timestamp_str = filename.split('_')[0]
                                 file_time = int(timestamp_str)
@@ -551,7 +525,6 @@ class DatasetManager:
                                 # If we can't parse timestamp, skip the file
                                 continue
             
-            # Remove empty directories
             for object_name in os.listdir(base_dir):
                 object_dir = os.path.join(base_dir, object_name)
                 if os.path.isdir(object_dir) and not os.listdir(object_dir):
@@ -565,5 +538,4 @@ class DatasetManager:
             return 0
 
 
-# Global dataset manager instance
 dataset_manager = DatasetManager()

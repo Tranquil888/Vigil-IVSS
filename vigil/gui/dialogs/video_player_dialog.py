@@ -29,7 +29,6 @@ class VideoPlayerDialog:
         self.video_path = video_path
         self.logger = get_ui_logger()
         
-        # Video state
         self.cap: Optional[cv2.VideoCapture] = None
         self.is_playing = False
         self.is_paused = False
@@ -40,38 +39,30 @@ class VideoPlayerDialog:
         self.video_width = 640
         self.video_height = 480
         
-        # Playback control
         self.playback_thread: Optional[threading.Thread] = None
         self.stop_playback = threading.Event()
         self.video_speed = 1.0
         
-        # UI elements
         self.video_label: Optional[tk.Label] = None
         self.progress_var = tk.DoubleVar()
         self.time_var = tk.StringVar(value="00:00 / 00:00")
         
-        # Create dialog
         self.dialog = tk.Toplevel(parent)
         self.dialog.title(title)
         self.dialog.geometry("800x600")
         self.dialog.resizable(True, True)
         
-        # Make dialog modal
         self.dialog.transient(parent)
         self.dialog.grab_set()
         
-        # Initialize video
         if not self._load_video():
             self.dialog.destroy()
             return
         
-        # Create UI
         self._create_widgets()
         
-        # Handle window closing
         self.dialog.protocol("WM_DELETE_WINDOW", self._on_closing)
         
-        # Center dialog on parent
         self._center_dialog()
         
         self.logger.info(f"Video player opened: {video_path}")
@@ -85,13 +76,11 @@ class VideoPlayerDialog:
                 messagebox.showerror("Error", f"Cannot open video file: {self.video_path}")
                 return False
             
-            # Get video properties
             self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
             self.fps = self.cap.get(cv2.CAP_PROP_FPS) or 30.0
             self.video_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             self.video_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             
-            # Calculate duration
             if self.fps > 0:
                 self.duration = self.total_frames / self.fps
             
@@ -107,24 +96,20 @@ class VideoPlayerDialog:
     
     def _create_widgets(self) -> None:
         """Create video player UI widgets."""
-        # Main container
         main_frame = ttk.Frame(self.dialog, padding="10")
         main_frame.grid(row=0, column=0, sticky="nsew")
         
-        # Configure grid weights
         self.dialog.rowconfigure(0, weight=1)
         self.dialog.columnconfigure(0, weight=1)
         main_frame.rowconfigure(0, weight=1)
         main_frame.columnconfigure(0, weight=1)
         
-        # Video display area
         video_frame = ttk.Frame(main_frame, relief="sunken", borderwidth=2)
         video_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 10))
         
         self.video_label = tk.Label(video_frame, bg="black")
         self.video_label.pack(expand=True, fill="both")
         
-        # Progress bar
         progress_frame = ttk.Frame(main_frame)
         progress_frame.grid(row=1, column=0, sticky="ew", pady=(0, 10))
         progress_frame.columnconfigure(0, weight=1)
@@ -142,11 +127,9 @@ class VideoPlayerDialog:
         self.time_label = ttk.Label(progress_frame, textvariable=self.time_var)
         self.time_label.grid(row=0, column=1)
         
-        # Control buttons
         controls_frame = ttk.Frame(main_frame)
         controls_frame.grid(row=2, column=0, sticky="ew")
         
-        # Playback controls
         self.play_button = ttk.Button(
             controls_frame, 
             text="▶ Play", 
@@ -176,7 +159,6 @@ class VideoPlayerDialog:
             width=8
         ).grid(row=0, column=3, padx=5)
         
-        # Speed control
         ttk.Label(controls_frame, text="Speed:").grid(row=0, column=4, padx=(20, 5))
         
         self.speed_var = tk.StringVar(value="1.0x")
@@ -201,7 +183,6 @@ class VideoPlayerDialog:
             state="disabled"
         ).grid(row=0, column=7, padx=5)
         
-        # Display first frame
         self._display_frame(0)
     
     def _center_dialog(self) -> None:
@@ -238,7 +219,6 @@ class VideoPlayerDialog:
         
         self.play_button.config(text="⏸ Pause")
         
-        # Start playback thread
         self.playback_thread = threading.Thread(target=self._playback_worker, daemon=True)
         self.playback_thread.start()
         
@@ -266,7 +246,6 @@ class VideoPlayerDialog:
         if self.playback_thread and self.playback_thread.is_alive():
             self.playback_thread.join(timeout=1.0)
         
-        # Reset to first frame
         self.current_frame = 0
         self._display_frame(0)
         self._update_progress()
@@ -282,21 +261,17 @@ class VideoPlayerDialog:
         while not self.stop_playback.is_set() and self.current_frame < self.total_frames:
             start_time = time.time()
             
-            # Display current frame
             self._display_frame(self.current_frame)
             self._update_progress()
             
-            # Move to next frame
             self.current_frame += 1
             
-            # Calculate delay for proper playback speed
             elapsed = time.time() - start_time
             sleep_time = max(0, frame_delay - elapsed)
             
             if sleep_time > 0:
                 self.stop_playback.wait(sleep_time)
         
-        # Playback finished
         if self.current_frame >= self.total_frames:
             self.dialog.after(0, self._playback_finished)
     
@@ -305,14 +280,12 @@ class VideoPlayerDialog:
         if not self.cap or frame_number < 0 or frame_number >= self.total_frames:
             return
         
-        # Check if dialog still exists
         try:
             if not self.dialog.winfo_exists():
                 return
         except tk.TclError:
             return
         
-        # Check if video label still exists
         try:
             if not self.video_label.winfo_exists():
                 return
@@ -320,10 +293,8 @@ class VideoPlayerDialog:
             return
         
         try:
-            # Set frame position
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
             
-            # Read frame
             ret, frame = self.cap.read()
             if not ret:
                 return
@@ -331,7 +302,6 @@ class VideoPlayerDialog:
             # Convert color space (BGR to RGB)
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             
-            # Resize frame to fit display (with widget existence check)
             try:
                 display_width = self.video_label.winfo_width()
                 display_height = self.video_label.winfo_height()
@@ -339,7 +309,6 @@ class VideoPlayerDialog:
                 return  # Widget destroyed, exit early
             
             if display_width > 1 and display_height > 1:
-                # Calculate aspect ratio
                 aspect_ratio = self.video_width / self.video_height
                 
                 if display_width / display_height > aspect_ratio:
@@ -351,15 +320,13 @@ class VideoPlayerDialog:
                 
                 frame_rgb = cv2.resize(frame_rgb, (new_width, new_height), interpolation=cv2.INTER_AREA)
             
-            # Convert to PIL Image and then to PhotoImage
             image = Image.fromarray(frame_rgb)
             photo = ImageTk.PhotoImage(image)
             
-            # Update label (check if widget still exists)
             try:
                 if self.video_label.winfo_exists():
                     self.video_label.config(image=photo)
-                    self.video_label.image = photo  # Keep reference
+                    self.video_label.image = photo  # Keep a reference so the image is not garbage collected.
             except tk.TclError:
                 pass  # Widget destroyed, ignore
             
@@ -368,7 +335,6 @@ class VideoPlayerDialog:
     
     def _update_progress(self) -> None:
         """Update progress bar and time display."""
-        # Check if dialog still exists
         try:
             if not self.dialog.winfo_exists():
                 return
@@ -437,7 +403,6 @@ class VideoPlayerDialog:
         """Handle playback completion."""
         self.is_playing = False
         
-        # Check if play button still exists before updating
         try:
             if hasattr(self, 'play_button') and self.play_button.winfo_exists():
                 self.play_button.config(text="▶ Play")

@@ -23,16 +23,13 @@ class TrainingService:
         self.face_detector = FaceDetector()
         self.dataset_manager = DatasetManager()
         
-        # Training state
         self.is_training = False
         self.training_thread: Optional[threading.Thread] = None
         self.last_training_result: Optional[Dict[str, Any]] = None
         
-        # Callbacks
         self.progress_callback: Optional[Callable] = None
         self.completion_callback: Optional[Callable] = None
         
-        # Configuration
         self.dataset_path = ""
         self.model_path = ""
         self.archive_path = ""
@@ -43,7 +40,6 @@ class TrainingService:
     def _load_configuration(self) -> None:
         """Load training configuration from settings."""
         try:
-            # Get paths from settings or use defaults
             base_path = settings.get_setting('base_path', os.getcwd())
             
             self.dataset_path = settings.get_setting(
@@ -61,7 +57,6 @@ class TrainingService:
                 os.path.join(base_path, 'data', 'data_archives', 'dataset_archives')
             )
             
-            # Set trainer configuration
             algorithm = settings.get_setting('model_algorithm', 'cnn')
             tolerance = float(settings.get_setting('recognition_tolerance', 0.6))
             
@@ -72,7 +67,6 @@ class TrainingService:
             
         except Exception as e:
             self.logger.error(f"Error loading training configuration: {e}")
-            # Use default values
             base_path = os.getcwd()
             self.dataset_path = os.path.join(base_path, 'data', 'dataset')
             self.model_path = os.path.join(base_path, 'data', 'encodings.pickle')
@@ -141,17 +135,14 @@ class TrainingService:
             return False
         
         try:
-            # Use custom paths if provided, otherwise use configured paths
             train_dataset_path = dataset_path or self.dataset_path
             train_model_path = model_path or self.model_path
             
-            # Validate dataset first
             validation_result = self.validate_dataset()
             if not validation_result['valid']:
                 self.logger.error(f"Dataset validation failed: {validation_result['errors']}")
                 return False
             
-            # Start training in separate thread
             self.training_thread = threading.Thread(
                 target=self._training_worker,
                 args=(train_dataset_path, train_model_path),
@@ -179,10 +170,8 @@ class TrainingService:
         try:
             self.logger.info("Training worker started")
             
-            # Perform training
             result = self.face_trainer.train_model(dataset_path, model_path)
             
-            # Update face detector with new model
             if result['success']:
                 try:
                     self.face_detector._load_encodings()
@@ -190,10 +179,8 @@ class TrainingService:
                 except Exception as e:
                     self.logger.error(f"Error updating face detector: {e}")
             
-            # Store result
             self.last_training_result = result
             
-            # Call completion callback
             if self.completion_callback:
                 self.completion_callback(result)
             
@@ -367,5 +354,4 @@ class TrainingService:
             return {'exists': False, 'error': str(e)}
 
 
-# Global training service instance
 training_service = TrainingService()

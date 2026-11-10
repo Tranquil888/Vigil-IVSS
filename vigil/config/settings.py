@@ -44,43 +44,42 @@ class SettingsManager:
                 )
             ''')
             
-            # Insert default settings
             defaults = [
-                ('model_forone', '0', '0', '0', '0', None, None, None, None, None, None),  # время на одну. объектов. файлов. размер
+                ('model_forone', '0', '0', '0', '0', None, None, None, None, None, None),
                 ('numberreestr', '10000', None, None, None, None, None, None, None, None, None),
-                ('model_algorithm', 'cnn', None, None, None, None, None, None, None, None, None),  # Face detection algorithm
-                ('recognition_tolerance', '0.6', None, None, None, None, None, None, None, None, None),  # Face recognition tolerance
+                ('model_algorithm', 'cnn', None, None, None, None, None, None, None, None, None),
+                ('recognition_tolerance', '0.6', None, None, None, None, None, None, None, None, None),
                 ('objects_pic', 'circle', None, None, None, None, None, None, None, None, None),
                 ('enabled_sec', '1', None, None, None, None, None, None, None, None, None),
                 ('stream', '127.0.0.1', '8000', None, None, None, None, None, None, None, None),
-                ('stream_res_qua', '704', '90', None, None, None, None, None, None, None, None),  # разрешение. качество
-                ('resolut_video_model', '60', None, None, None, None, None, None, None, None, None),  # резрешение для модели
+                ('stream_res_qua', '704', '90', None, None, None, None, None, None, None, None),
+                ('resolut_video_model', '60', None, None, None, None, None, None, None, None, None),
                 ('facerecog_granici1_face', '2', '4', '6', None, None, None, None, None, None, None),
-                ('video_save', '10', 'XVID', '15', None, None, None, None, None, None, None),  # продолжит. кодек. кадров
-                ('foto_save', '10', None, None, None, None, None, None, None, None, None),  # сохранение кадров для известных
-                ('oper_jurnal', '5', '60', None, None, None, None, None, None, None, None),  # групировка строк в оперативном журнале
-                ('time_format', '1', None, None, None, None, None, None, None, None, None),  # формат времени
+                ('video_save', '10', 'XVID', '15', None, None, None, None, None, None, None),
+                ('foto_save', '10', None, None, None, None, None, None, None, None, None),
+                ('oper_jurnal', '5', '60', None, None, None, None, None, None, None, None),
+                ('time_format', '1', None, None, None, None, None, None, None, None, None),
                 # Training-related settings
-                ('base_path', os.getcwd(), None, None, None, None, None, None, None, None, None),  # Base application path
-                ('dataset_path', os.path.join(os.getcwd(), 'data', 'dataset'), None, None, None, None, None, None, None, None, None),  # Training dataset path
-                ('model_path', os.path.join(os.getcwd(), 'data', 'encodings.pickle'), None, None, None, None, None, None, None, None, None),  # Model file path
-                ('archive_path', os.path.join(os.getcwd(), 'data', 'data_archives', 'dataset_archives'), None, None, None, None, None, None, None, None, None),  # Archive path
-                ('auto_retrain', '0', None, None, None, None, None, None, None, None, None),  # Auto retrain on dataset changes
-                ('min_images_per_person', '5', None, None, None, None, None, None, None, None, None),  # Minimum images required per person
+                ('base_path', os.getcwd(), None, None, None, None, None, None, None, None, None),
+                ('dataset_path', os.path.join(os.getcwd(), 'data', 'dataset'), None, None, None, None, None, None, None, None, None),
+                ('model_path', os.path.join(os.getcwd(), 'data', 'encodings.pickle'), None, None, None, None, None, None, None, None, None),
+                ('archive_path', os.path.join(os.getcwd(), 'data', 'data_archives', 'dataset_archives'), None, None, None, None, None, None, None, None, None),
+                ('auto_retrain', '0', None, None, None, None, None, None, None, None, None),
+                ('min_images_per_person', '5', None, None, None, None, None, None, None, None, None),
                 # Face recognition runtime settings
-                ('face_recognition_enabled', '1', None, None, None, None, None, None, None, None, None),  # Enable/disable face recognition
+                ('face_recognition_enabled', '1', None, None, None, None, None, None, None, None, None),
                 ('recognition_confidence_threshold', '0.6', None, None, None, None, None, None, None, None, None),  # Recognition tolerance (0.1=strict, 0.8=lenient)
-                ('recognition_frame_skip', '3', None, None, None, None, None, None, None, None, None),  # Process every Nth frame for recognition
-                ('recognition_cooldown', '2', None, None, None, None, None, None, None, None, None),  # Seconds between recognition events for same person
-                ('show_unknown_faces', '1', None, None, None, None, None, None, None, None, None),  # Show unknown face alerts
-                ('camera_max_fps', '30', None, None, None, None, None, None, None, None, None),  # Maximum camera FPS
-                ('recognition_roi_enabled', '0', None, None, None, None, None, None, None, None, None),  # Enable region of interest for recognition
+                ('recognition_frame_skip', '3', None, None, None, None, None, None, None, None, None),
+                ('recognition_cooldown', '2', None, None, None, None, None, None, None, None, None),
+                ('show_unknown_faces', '1', None, None, None, None, None, None, None, None, None),
+                ('camera_max_fps', '30', None, None, None, None, None, None, None, None, None),
+                ('recognition_roi_enabled', '0', None, None, None, None, None, None, None, None, None),
                 # Video analysis settings
-                ('video_loop_playback', '0', None, None, None, None, None, None, None, None, None),  # Loop video playback
-                ('video_progress_show', '1', None, None, None, None, None, None, None, None, None),  # Show video progress bar
-                ('video_playback_speed', '1.0', None, None, None, None, None, None, None, None, None),  # Video playback speed multiplier
+                ('video_loop_playback', '0', None, None, None, None, None, None, None, None, None),
+                ('video_progress_show', '1', None, None, None, None, None, None, None, None, None),
+                ('video_playback_speed', '1.0', None, None, None, None, None, None, None, None, None),
                 # Event journal settings
-                ('event_inactivity_delay', '10', None, None, None, None, None, None, None, None, None),  # Event inactivity delay in seconds
+                ('event_inactivity_delay', '10', None, None, None, None, None, None, None, None, None),
             ]
             
             for default in defaults:
@@ -104,7 +103,6 @@ class SettingsManager:
             connection.close()
             
             if result:
-                # Return first non-None value
                 for value in result:
                     if value is not None:
                         return value
@@ -120,16 +118,13 @@ class SettingsManager:
             connection = sqlite3.connect(self.db_path)
             cursor = connection.cursor()
             
-            # Check if setting exists
             cursor.execute('SELECT parametr_name FROM setting WHERE parametr_name = ?', (parameter_name,))
             exists = cursor.fetchone()
             
             if exists:
-                # Update existing setting
                 placeholders = ','.join([f'set{i+1:02d} = ?' for i in range(len(values))])
                 cursor.execute(f'UPDATE setting SET {placeholders} WHERE parametr_name = ?', values + (parameter_name,))
             else:
-                # Insert new setting
                 # Database has 11 columns: parametr_name + set01-set10
                 total_columns = 11
                 current_values = (parameter_name,) + values
@@ -177,5 +172,4 @@ class SettingsManager:
             return {}
 
 
-# Global settings instance
 settings = SettingsManager()

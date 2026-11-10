@@ -39,7 +39,6 @@ class TrainingDialog:
         self.dialog.transient(self.parent)
         self.dialog.grab_set()
         
-        # Center dialog
         self.dialog.update_idletasks()
         x = (self.dialog.winfo_screenwidth() // 2) - (600 // 2)
         y = (self.dialog.winfo_screenheight() // 2) - (500 // 2)
@@ -49,20 +48,16 @@ class TrainingDialog:
         self._load_current_settings()
         self._update_dataset_info()
         
-        # Handle dialog closing
         self.dialog.protocol("WM_DELETE_WINDOW", self._on_closing)
         
     def _create_widgets(self) -> None:
         """Create dialog widgets."""
-        # Main frame
         main_frame = ttk.Frame(self.dialog, padding="10")
         main_frame.pack(fill='both', expand=True)
         
-        # Configuration frame
         config_frame = ttk.LabelFrame(main_frame, text="Training Configuration", padding="10")
         config_frame.pack(fill='x', pady=(0, 10))
         
-        # Dataset path
         ttk.Label(config_frame, text="Dataset Path:").grid(row=0, column=0, sticky='w', pady=2)
         self.dataset_path_var = tk.StringVar()
         dataset_frame = ttk.Frame(config_frame)
@@ -71,7 +66,6 @@ class TrainingDialog:
         ttk.Entry(dataset_frame, textvariable=self.dataset_path_var, width=50).pack(side='left', fill='x', expand=True)
         ttk.Button(dataset_frame, text="Browse", command=self._browse_dataset).pack(side='right', padx=(5, 0))
         
-        # Model path
         ttk.Label(config_frame, text="Model Output Path:").grid(row=1, column=0, sticky='w', pady=2)
         self.model_path_var = tk.StringVar()
         model_frame = ttk.Frame(config_frame)
@@ -80,7 +74,6 @@ class TrainingDialog:
         ttk.Entry(model_frame, textvariable=self.model_path_var, width=50).pack(side='left', fill='x', expand=True)
         ttk.Button(model_frame, text="Browse", command=self._browse_model).pack(side='right', padx=(5, 0))
         
-        # Algorithm selection
         ttk.Label(config_frame, text="Detection Algorithm:").grid(row=2, column=0, sticky='w', pady=2)
         self.algorithm_var = tk.StringVar(value="cnn")
         algorithm_frame = ttk.Frame(config_frame)
@@ -91,7 +84,6 @@ class TrainingDialog:
         ttk.Radiobutton(algorithm_frame, text="HOG (Fast)", variable=self.algorithm_var, 
                        value="hog").pack(side='left')
         
-        # Tolerance
         ttk.Label(config_frame, text="Recognition Tolerance:").grid(row=3, column=0, sticky='w', pady=2)
         self.tolerance_var = tk.StringVar(value="0.6")
         tolerance_frame = ttk.Frame(config_frame)
@@ -100,17 +92,14 @@ class TrainingDialog:
         ttk.Entry(tolerance_frame, textvariable=self.tolerance_var, width=10).pack(side='left')
         ttk.Label(tolerance_frame, text="(0.0-1.0, lower = more strict)").pack(side='left', padx=(5, 0))
         
-        # Configure grid weights
         config_frame.columnconfigure(1, weight=1)
         
-        # Dataset info frame
         info_frame = ttk.LabelFrame(main_frame, text="Dataset Information", padding="10")
         info_frame.pack(fill='x', pady=(0, 10))
         
         self.stats_label = ttk.Label(info_frame, text="Loading dataset information...")
         self.stats_label.pack(anchor='w')
         
-        # Progress frame
         progress_frame = ttk.LabelFrame(main_frame, text="Training Progress", padding="10")
         progress_frame.pack(fill='x', pady=(0, 10))
         
@@ -122,7 +111,6 @@ class TrainingDialog:
         self.status_label = ttk.Label(progress_frame, text="Ready to start training")
         self.status_label.pack(anchor='w')
         
-        # Buttons frame
         buttons_frame = ttk.Frame(main_frame)
         buttons_frame.pack(fill='x', pady=(10, 0))
         
@@ -151,7 +139,6 @@ class TrainingDialog:
             self.dataset_path_var.set(status.get('dataset_path', ''))
             self.model_path_var.set(status.get('model_path', ''))
             
-            # Load algorithm and tolerance from face detector
             model_info = training_service.get_model_info()
             if model_info.get('algorithm'):
                 self.algorithm_var.set(model_info['algorithm'])
@@ -212,7 +199,6 @@ class TrainingDialog:
     def _validate_settings(self) -> bool:
         """Validate training settings."""
         try:
-            # Check dataset path
             dataset_path = self.dataset_path_var.get()
             if not dataset_path:
                 messagebox.showerror("Error", "Please specify a dataset path")
@@ -222,13 +208,11 @@ class TrainingDialog:
                 messagebox.showerror("Error", "Dataset directory does not exist")
                 return False
             
-            # Check model path
             model_path = self.model_path_var.get()
             if not model_path:
                 messagebox.showerror("Error", "Please specify a model output path")
                 return False
             
-            # Check tolerance
             try:
                 tolerance = float(self.tolerance_var.get())
                 if not 0.0 <= tolerance <= 1.0:
@@ -238,7 +222,6 @@ class TrainingDialog:
                 messagebox.showerror("Error", "Invalid tolerance value")
                 return False
             
-            # Validate dataset
             validation = training_service.validate_dataset()
             if not validation['valid']:
                 errors = '\\n'.join(validation['errors'])
@@ -258,21 +241,17 @@ class TrainingDialog:
             return
         
         try:
-            # Update training service settings
             dataset_path = self.dataset_path_var.get()
             model_path = self.model_path_var.get()
             algorithm = self.algorithm_var.get()
             tolerance = float(self.tolerance_var.get())
             
-            # Set callbacks
             training_service.set_callbacks(
                 progress_callback=self._on_progress,
                 completion_callback=self._on_training_complete
             )
             
-            # Start training
             if training_service.start_training(dataset_path, model_path):
-                # Update UI
                 self.start_button.config(state='disabled')
                 self.stop_button.config(state='normal')
                 self.close_button.config(state='disabled')
@@ -319,7 +298,6 @@ class TrainingDialog:
     def _on_training_complete(self, result: dict) -> None:
         """Handle training completion."""
         try:
-            # Update UI
             self.start_button.config(state='normal')
             self.stop_button.config(state='disabled')
             self.close_button.config(state='normal')
@@ -327,7 +305,6 @@ class TrainingDialog:
             if result.get('success'):
                 self.progress_var.set(100)
                 
-                # Show success message
                 msg = f"Training completed successfully!\\n\\n"
                 msg += f"Images processed: {result.get('total_images', 0)}\\n"
                 msg += f"Faces found: {result.get('processed_faces', 0)}\\n"
@@ -338,7 +315,6 @@ class TrainingDialog:
                 messagebox.showinfo("Training Complete", msg)
                 self.status_label.config(text="Training completed successfully")
                 
-                # Update dataset info
                 self._update_dataset_info()
                 
             else:
@@ -370,7 +346,6 @@ class TrainingDialog:
     
     def _on_closing(self) -> None:
         """Handle dialog closing."""
-        # Check if training is in progress
         status = training_service.get_training_status()
         if status.get('is_training'):
             if not messagebox.askokcancel("Training in Progress", 

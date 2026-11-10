@@ -26,13 +26,10 @@ class VigilApp:
     def initialize(self) -> bool:
         """Initialize the application and all its components."""
         try:
-            # Load application settings
             self._load_settings()
             
-            # Initialize training service
             self._initialize_training_service()
             
-            # Initialize main window
             self._create_main_window()
             
             self.logger.info("Application initialized successfully")
@@ -45,11 +42,9 @@ class VigilApp:
     def _load_settings(self) -> None:
         """Load application settings."""
         try:
-            # Load time format setting
             time_format = settings.get_setting('time_format', '1')
             self.logger.info(f"Time format setting loaded: {time_format}")
             
-            # Load other essential settings
             self.logger.info("Application settings loaded successfully")
             
         except Exception as e:
@@ -59,7 +54,6 @@ class VigilApp:
         """Initialize the training service."""
         try:
             # Training service is automatically initialized on import
-            # Just verify it's working
             status = training_service.get_training_status()
             self.logger.info(f"Training service initialized: {status}")
             
@@ -71,16 +65,12 @@ class VigilApp:
         self.root = tk.Tk()
         self.root.title("Vigil - Intelligent Video Surveillance System")
         
-        # Set minimum window size
         self.root.minsize(800, 600)
         
-        # Center window on screen
         self._center_window()
         
-        # Setup window close handler
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         
-        # Create main window GUI
         self.main_window = MainWindow(self.root)
         
         self.logger.info("Main window created")
@@ -115,7 +105,6 @@ class VigilApp:
         if self.root and self.is_running:
             self.logger.info("Stopping application")
             
-            # Stop training service if active
             try:
                 status = training_service.get_training_status()
                 if status.get('is_training'):
@@ -154,5 +143,4 @@ class VigilApp:
         return None
 
 
-# Global application instance
 app = VigilApp()

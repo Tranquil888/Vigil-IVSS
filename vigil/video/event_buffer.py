@@ -34,16 +34,13 @@ class EventVideoBuffer:
         self.is_recording = False
         self.recording_lock = threading.Lock()
         
-        # Recording state
         self.recording_frames = []
         self.recording_start_time = None
         self.recording_session_id = None
         
-        # Video storage directory
         self.video_dir = os.path.join(get_data_dir(), 'event_videos')
         os.makedirs(self.video_dir, exist_ok=True)
         
-        # Statistics
         self.frames_captured = 0
         self.videos_saved = 0
         
@@ -81,10 +78,8 @@ class EventVideoBuffer:
         if self.is_recording and self.recording_session_id is not None:
             self.recording_frames.append(frame_data)
             
-            # Check if we have recorded enough frames
             recording_duration = timestamp - self.recording_start_time
             if recording_duration >= self.buffer_duration:
-                # Stop recording and save video
                 self._finish_recording()
     
     def start_event_capture(self, session_id: int, event_start_time: str) -> Optional[str]:
@@ -123,15 +118,12 @@ class EventVideoBuffer:
             # Sort frames by timestamp
             self.recording_frames.sort(key=lambda x: x['timestamp'])
             
-            # Calculate video properties
             height, width = self.recording_frames[0]['frame'].shape[:2]
             
-            # Generate video filename
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"event_{session_id:05d}_{timestamp}.mp4"
             video_path = os.path.join(self.video_dir, filename)
             
-            # Create video writer
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             out = cv2.VideoWriter(
                 video_path, 
@@ -144,7 +136,6 @@ class EventVideoBuffer:
                 self.logger.error("Failed to create video writer")
                 return
             
-            # Write frames
             frames_written = 0
             start_time = self.recording_frames[0]['timestamp']
             end_time = self.recording_frames[-1]['timestamp']
@@ -155,15 +146,12 @@ class EventVideoBuffer:
             
             out.release()
             
-            # Get file size
             file_size = os.path.getsize(video_path)
             
-            # Calculate duration
             duration = int(end_time - start_time)
             
             self.logger.info(f"Saved event video: {filename} ({frames_written} frames, {duration}s, {file_size} bytes)")
             
-            # Store in database
             self._store_video_record(session_id, video_path, event_start_time, 
                                    datetime.fromtimestamp(end_time).strftime("%Y-%m-%d %H:%M:%S"),
                                    duration, file_size)
@@ -173,7 +161,6 @@ class EventVideoBuffer:
         except Exception as e:
             self.logger.error(f"Error saving event video: {e}")
         finally:
-            # Reset recording state
             with self.recording_lock:
                 self.is_recording = False
                 self.recording_frames = []
@@ -216,5 +203,4 @@ class EventVideoBuffer:
         self.logger.info("Video buffer cleared")
 
 
-# Global video buffer instance
 event_video_buffer = EventVideoBuffer()

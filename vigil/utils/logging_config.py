@@ -17,12 +17,10 @@ class VigilLogger:
     
     def _setup_logging(self) -> None:
         """Setup basic logging configuration."""
-        # Create logs directory if it doesn't exist
         log_dir = os.path.dirname(LOG_FILE)
         if log_dir and not os.path.exists(log_dir):
             os.makedirs(log_dir, exist_ok=True)
         
-        # Configure root logger
         logging.basicConfig(
             level=logging.INFO,
             format=LOG_FORMAT,
@@ -44,10 +42,8 @@ class VigilLogger:
         logger.error(error_msg, exc_info=True)
 
 
-# Global logger instance
 vigil_logger = VigilLogger()
 
-# Convenience functions for getting specific loggers
 def get_main_logger() -> logging.Logger:
     """Get the main application logger."""
     return vigil_logger.get_logger("vigil.main")
@@ -93,7 +89,6 @@ def get_service_logger() -> logging.Logger:
     return vigil_logger.get_logger("vigil.service")
 
 
-# Export the main logging function
 def log_exception(logger: logging.Logger, error: Exception, context: str = "") -> None:
     """Log an exception with context information."""
     vigil_logger.log_exception(logger, error, context)

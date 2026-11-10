@@ -28,14 +28,11 @@ class ObjectsManager:
     def _initialize_database(self) -> None:
         """Create database and tables if they don't exist."""
         try:
-            # Ensure data directory exists
             os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
             
-            # Connect to database
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
-            # Create People table
             cursor.execute('''
             CREATE TABLE IF NOT EXISTS People (
                 last_name TEXT,
@@ -57,7 +54,6 @@ class ObjectsManager:
             )
             ''')
             
-            # Insert default Unknown record if it doesn't exist
             cursor.execute('SELECT COUNT(*) FROM People WHERE modelfolder = ?', ('Unknown',))
             if cursor.fetchone()[0] == 0:
                 cursor.execute('''
@@ -136,41 +132,33 @@ class ObjectsManager:
     def add_object(self, object_data: Dict[str, Any]) -> Tuple[bool, str]:
         """Add a new object to the database."""
         try:
-            # Validate required fields
             if not object_data.get('first_name') or not object_data.get('last_name'):
                 return False, "First name and last name are required"
             
-            # Validate name format
             if not self._validate_name(object_data['first_name']):
                 return False, "Invalid first name format"
             
             if not self._validate_name(object_data['last_name']):
                 return False, "Invalid last name format"
             
-            # Validate comments length
             if object_data.get('ob_komments') and len(object_data['ob_komments']) > 500:
                 return False, "Comments too long (max 500 characters)"
             
-            # Generate model folder name
             modelfolder = self._generate_model_folder(
                 object_data['first_name'], 
                 object_data['category']
             )
             
-            # Check for duplicates
             if self.get_object_by_folder(modelfolder):
                 return False, "Object with this name already exists"
             
-            # Set default values
             object_data['modelfolder'] = modelfolder
             object_data['foto'] = self._get_avatar_for_category(object_data.get('category', '4'))
             
-            # Set default values for optional fields
             for field in ['homenumb', 'apartmentnumb', 'floornumb', 'phone']:
                 if not object_data.get(field):
                     object_data[field] = "0"
             
-            # Insert into database
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
@@ -196,7 +184,6 @@ class ObjectsManager:
             conn.commit()
             conn.close()
             
-            # Create dataset folder
             self._create_dataset_folder(modelfolder)
             
             logger.info(f"Added new object: {object_data['first_name']} {object_data['last_name']}")
@@ -209,26 +196,21 @@ class ObjectsManager:
     def update_object(self, modelfolder: str, object_data: Dict[str, Any]) -> Tuple[bool, str]:
         """Update an existing object."""
         try:
-            # Cannot update Unknown object
             if modelfolder == 'Unknown':
                 return False, "Cannot update Unknown object"
             
-            # Validate required fields
             if not object_data.get('first_name') or not object_data.get('last_name'):
                 return False, "First name and last name are required"
             
-            # Validate name format
             if not self._validate_name(object_data['first_name']):
                 return False, "Invalid first name format"
             
             if not self._validate_name(object_data['last_name']):
                 return False, "Invalid last name format"
             
-            # Validate comments length
             if object_data.get('ob_komments') and len(object_data['ob_komments']) > 500:
                 return False, "Comments too long (max 500 characters)"
             
-            # Update database
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
@@ -265,16 +247,13 @@ class ObjectsManager:
     def delete_object(self, modelfolder: str) -> Tuple[bool, str]:
         """Delete an object from the database."""
         try:
-            # Cannot delete Unknown object
             if modelfolder == 'Unknown':
                 return False, "Cannot delete Unknown object"
             
-            # Get object info before deletion
             obj = self.get_object_by_folder(modelfolder)
             if not obj:
                 return False, "Object not found"
             
-            # Delete from database
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
@@ -284,7 +263,6 @@ class ObjectsManager:
             conn.close()
             
             # Optionally remove dataset folder (ask user in UI)
-            # self._remove_dataset_folder(modelfolder)
             
             logger.info(f"Deleted object: {modelfolder}")
             return True, f"Object '{obj['first_name']} {obj['last_name']}' deleted successfully"
@@ -301,7 +279,6 @@ class ObjectsManager:
     
     def _generate_model_folder(self, first_name: str, category: str) -> str:
         """Generate unique model folder name."""
-        # Get next number from registry
         registry_path = os.path.join(os.path.dirname(self.db_path), '..', 'numberreestr.txt')
         
         try:
@@ -316,7 +293,6 @@ class ObjectsManager:
         except:
             number = 10000
         
-        # Transliterate first name
         transliterated = ''.join(
             translit(char, "ru", "en") if 'а' <= char <= 'я' or 'А' <= char <= 'Я' else char
             for char in first_name.strip()
@@ -338,13 +314,11 @@ class ObjectsManager:
         """Get dataset folder path, checking both old and new locations for backward compatibility."""
         from vigil.config.settings import settings
         
-        # Primary location (correct)
         new_path = os.path.join(settings.get_setting('dataset_path'), modelfolder)
         
         # Fallback location (old, for backward compatibility)
         old_path = os.path.join(os.path.dirname(self.db_path), '..', 'dataset', modelfolder)
         
-        # Return the path that exists, or the new path if neither exists
         if os.path.exists(new_path):
             return new_path
         elif os.path.exists(old_path):
@@ -374,5 +348,4 @@ class ObjectsManager:
             logger.error(f"Failed to remove dataset folder {dataset_path}: {e}")
 
 
-# Global instance
 objects_manager = ObjectsManager()

@@ -126,7 +126,6 @@ class Object:
         if not self.first_name:
             return f"{number}_{self.category}_Unknown"
         
-        # Transliterate first name
         transliterated = ''.join(
             translit(char, "ru", "en") if 'а' <= char <= 'я' or 'А' <= char <= 'Я' else char
             for char in self.first_name.strip()
@@ -138,7 +137,6 @@ class Object:
         """Validate object data."""
         errors = []
         
-        # Validate first name
         if not self.first_name:
             errors.append("First name is required")
         elif len(self.first_name) > 20:
@@ -146,7 +144,6 @@ class Object:
         elif not self._validate_name_format(self.first_name):
             errors.append("First name contains invalid characters")
         
-        # Validate last name
         if not self.last_name:
             errors.append("Last name is required")
         elif len(self.last_name) > 20:
@@ -154,7 +151,6 @@ class Object:
         elif not self._validate_name_format(self.last_name):
             errors.append("Last name contains invalid characters")
         
-        # Validate comments
         if self.ob_komments and len(self.ob_komments) > 500:
             errors.append("Comments too long (max 500 characters)")
         

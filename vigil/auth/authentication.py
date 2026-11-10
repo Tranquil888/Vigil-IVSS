@@ -38,27 +38,22 @@ class AuthenticationManager:
             if not username or not password:
                 return False, "Username and password are required"
             
-            # Get user from database
             user = self.db.get_user(username)
             if not user:
                 self.logger.warning(f"Authentication failed: user '{username}' not found")
                 return False, "Invalid username or password"
             
-            # Check login attempts
             if user.get('login_attempts', 0) >= self.max_attempts:
                 self.logger.warning(f"Authentication blocked: user '{username}' exceeded max attempts")
                 return False, "Account locked due to too many failed attempts"
             
-            # Verify password
             password_hash = self.hash_password(password)
             if password_hash != user.get('password_hash'):
-                # Increment login attempts
                 attempts = user.get('login_attempts', 0) + 1
                 self.db.update_login_attempt(username, attempts)
                 self.logger.warning(f"Authentication failed: invalid password for user '{username}'")
                 return False, "Invalid username or password"
             
-            # Successful authentication
             self.db.update_last_login(username)
             self.logger.info(f"User '{username}' authenticated successfully")
             return True, "Authentication successful"
@@ -75,7 +70,6 @@ class AuthenticationManager:
             Tuple of (success, message)
         """
         try:
-            # Validate inputs
             if not username or not password:
                 return False, "Username and password are required"
             
@@ -87,12 +81,10 @@ class AuthenticationManager:
             if role not in ["admin", "operator"]:
                 return False, "Role must be 'admin' or 'operator'"
             
-            # Check if user already exists
             existing_user = self.db.get_user(username)
             if existing_user:
                 return False, "Username already exists"
             
-            # Create user
             password_hash = self.hash_password(password)
             success = self.db.create_user(username, password_hash, role)
             
@@ -148,5 +140,4 @@ class AuthenticationManager:
             return False
 
 
-# Global authentication instance
 auth_manager = AuthenticationManager()

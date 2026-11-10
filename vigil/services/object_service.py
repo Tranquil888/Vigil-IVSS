@@ -47,12 +47,10 @@ class ObjectService:
     def add_object(self, obj: Object) -> Tuple[bool, str]:
         """Add a new object to the system."""
         try:
-            # Validate object
             is_valid, error_message = obj.validate()
             if not is_valid:
                 return False, error_message
             
-            # Generate model folder
             next_number = self._get_next_object_number()
             obj.modelfolder = obj.generate_model_folder(next_number)
             
@@ -60,7 +58,6 @@ class ObjectService:
             if not obj.foto or obj.foto == "no_avatar_red.jpg":
                 obj.foto = obj.get_avatar_filename()
             
-            # Add to database
             success, message = self.objects_manager.add_object(obj.to_dict())
             
             if success:
@@ -77,7 +74,6 @@ class ObjectService:
     def update_object(self, modelfolder: str, obj: Object) -> Tuple[bool, str]:
         """Update an existing object."""
         try:
-            # Validate object
             is_valid, error_message = obj.validate()
             if not is_valid:
                 return False, error_message
@@ -86,7 +82,6 @@ class ObjectService:
             if not obj.foto or obj.foto in ['no_avatar_green.jpg', 'no_avatar_grey.jpg', 'no_avatar_blue.jpg', 'no_avatar_red.jpg']:
                 obj.foto = obj.get_avatar_filename()
             
-            # Update in database
             success, message = self.objects_manager.update_object(modelfolder, obj.to_dict())
             
             if success:
@@ -103,7 +98,6 @@ class ObjectService:
     def delete_object(self, modelfolder: str, remove_dataset: bool = False) -> Tuple[bool, str]:
         """Delete an object from the system."""
         try:
-            # Get object info for logging
             obj = self.get_object_by_folder(modelfolder)
             if not obj:
                 return False, "Object not found"
@@ -111,11 +105,9 @@ class ObjectService:
             if not obj.is_deletable():
                 return False, "Cannot delete system object"
             
-            # Delete from database
             success, message = self.objects_manager.delete_object(modelfolder)
             
             if success:
-                # Remove dataset folder if requested
                 if remove_dataset:
                     self.objects_manager._remove_dataset_folder(modelfolder)
                     message += " (dataset folder removed)"
@@ -143,15 +135,12 @@ class ObjectService:
             }
             
             for obj in objects:
-                # Count by category
                 category_name = obj.get_category_name()
                 stats['by_category'][category_name] = stats['by_category'].get(category_name, 0) + 1
                 
-                # Count objects with dataset folders
                 if obj.modelfolder and obj.modelfolder != "Unknown":
                     stats['with_dataset_folders'] += 1
                 
-                # Count editable objects
                 if obj.is_editable():
                     stats['editable_objects'] += 1
             
@@ -172,7 +161,6 @@ class ObjectService:
             
             filtered_objects = []
             for obj in objects:
-                # Search in multiple fields
                 searchable_text = f"{obj.first_name} {obj.last_name} {obj.phone} {obj.ob_komments}".lower()
                 if query_lower in searchable_text:
                     filtered_objects.append(obj)
@@ -234,5 +222,4 @@ class ObjectService:
             return 10000
 
 
-# Global service instance
 object_service = ObjectService()

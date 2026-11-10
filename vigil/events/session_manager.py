@@ -22,21 +22,17 @@ class EventSessionManager:
         self.logger.info("Initializing EventSessionManager")
         
         self.db = get_events_db()
-        # Load inactivity delay from settings
         self.inactivity_delay = int(settings.get_setting('event_inactivity_delay', 10))
         
-        # Session tracking
         self.current_session_id: Optional[int] = None
         self.session_start_time: Optional[float] = None
         self.last_activity_time: Optional[float] = None
         self.session_timer: Optional[threading.Timer] = None
         self.session_lock = threading.Lock()
         
-        # Event counter for descriptions
         self.event_counter = 0
         self._load_event_counter()
         
-        # Check for existing active sessions on startup
         self._check_existing_sessions()
         
         self.logger.info(f"EventSessionManager initialized: current_session_id={self.current_session_id}")
@@ -44,7 +40,6 @@ class EventSessionManager:
     def _load_event_counter(self) -> None:
         """Load the event counter from database."""
         try:
-            # Get the latest event session to determine counter
             sessions = self.db.get_event_sessions(limit=1)
             if sessions:
                 # Extract counter from description like "event00001-3-objects"
@@ -53,7 +48,7 @@ class EventSessionManager:
                     description = latest_session['description']
                     if description.startswith('event') and '-' in description:
                         try:
-                            counter_part = description.split('-')[0]  # "event00001"
+                            counter_part = description.split('-')[0]
                             counter = int(counter_part.replace('event', ''))
                             self.event_counter = counter
                             self.logger.info(f"Loaded event counter: {self.event_counter}")
@@ -79,21 +74,18 @@ class EventSessionManager:
                 session_id = session['id']
                 start_time_str = session['start_time']
                 
-                # Parse start time
                 try:
                     start_time = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
                     start_timestamp = start_time.timestamp()
                 except:
                     start_timestamp = time.time()
                 
-                # Set as current session
                 self.current_session_id = session_id
                 self.session_start_time = start_timestamp
                 self.last_activity_time = start_timestamp
                 
                 self.logger.info(f"Resumed active session: {session_id} from {start_time_str}")
                 
-                # Start timer for this session
                 self._reset_session_timer()
             else:
                 self.logger.info("No active sessions found on startup")
@@ -118,18 +110,15 @@ class EventSessionManager:
             
             self.logger.debug(f"Session check: current_id={self.current_session_id}, last_activity={self.last_activity_time}, delay={self.inactivity_delay}")
             
-            # If no active session, start one
             if self.current_session_id is None:
                 self.logger.debug("No active session, starting new one")
                 return self._start_new_session()
             
-            # If session exists but timer expired, start new one
             elif self.last_activity_time and (current_time - self.last_activity_time) > self.inactivity_delay:
                 self.logger.debug(f"Session expired ({current_time - self.last_activity_time:.1f}s > {self.inactivity_delay}s), starting new one")
                 self._end_current_session()
                 return self._start_new_session()
             
-            # Reset timer for existing session
             else:
                 self.logger.debug(f"Using existing session {self.current_session_id}")
                 self._reset_session_timer()
@@ -143,17 +132,14 @@ class EventSessionManager:
             current_time = time.time()
             timestamp = datetime.fromtimestamp(current_time).strftime("%Y-%m-%d %H:%M:%S")
             
-            # Create new session with placeholder description
             session_id = self.db.create_event_session(timestamp, "active-session")
             
             self.current_session_id = session_id
             self.session_start_time = current_time
             self.last_activity_time = current_time
             
-            # Start video capture for this event
             self._start_event_video(session_id, timestamp)
             
-            # Start inactivity timer
             self._reset_session_timer()
             
             self.logger.info(f"Started new event session: {session_id}")
@@ -166,7 +152,6 @@ class EventSessionManager:
     def _start_event_video(self, session_id: int, timestamp: str) -> None:
         """Start video capture for event."""
         try:
-            # Start video capture in background thread
             video_thread = threading.Thread(
                 target=self._capture_event_video,
                 args=(session_id, timestamp),
@@ -195,22 +180,18 @@ class EventSessionManager:
             return
         
         try:
-            # Cancel any pending timer
             if self.session_timer:
                 self.session_timer.cancel()
                 self.session_timer = None
             
-            # Calculate session duration
             current_time = time.time()
             duration = int(current_time - self.session_start_time) if self.session_start_time else 0
             end_time = datetime.fromtimestamp(current_time).strftime("%Y-%m-%d %H:%M:%S")
             
-            # Get object count for description
             objects = self.db.get_event_objects(self.current_session_id)
             object_count = len(set(obj['object_name'] for obj in objects))
             description = self._generate_event_description(object_count)
             
-            # Update session in database
             self.db.end_event_session(self.current_session_id, end_time, duration)
             self.db.execute_update(
                 'UPDATE event_sessions SET description = ? WHERE id = ?',
@@ -262,10 +243,8 @@ class EventSessionManager:
             True if event added successfully
         """
         try:
-            # Feed frame to video buffer
             event_video_buffer.add_frame(frame)
             
-            # Ensure we have an active session
             session_id = self.start_session_if_needed()
             if session_id is None:
                 self.logger.error("Failed to get active session")
@@ -275,24 +254,20 @@ class EventSessionManager:
             
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
-            # Add object recognition to database
             self.db.add_event_object(
                 session_id, object_name, object_type, current_time, confidence
             )
             
-            # Capture face if object is known (not Unknown)
             photo_path = None
             if object_name != 'Unknown':
                 photo_path = dataset_manager.capture_face(frame, face_location, object_name)
                 
                 if photo_path:
-                    # Add photo to database
                     self.db.add_event_photo(
                         session_id, object_name, photo_path, current_time, confidence
                     )
                     self.logger.info(f"Captured face for {object_name}: {photo_path}")
             
-            # Reset activity timer
             self._reset_session_timer()
             
             self.logger.debug(f"Added recognition event: {object_name} (confidence: {confidence:.2f})")
@@ -354,7 +329,6 @@ class EventSessionManager:
         """Update the inactivity delay."""
         self.inactivity_delay = max(1, delay)  # Minimum 1 second
         
-        # Save to settings
         settings.set_setting('event_inactivity_delay', str(self.inactivity_delay))
         
         self.logger.info(f"Updated inactivity delay to {self.inactivity_delay} seconds")
@@ -375,7 +349,6 @@ class EventSessionManager:
     def _fix_orphaned_sessions(self) -> None:
         """Fix sessions that were not properly ended."""
         try:
-            # Get all sessions without end_time
             orphaned = self.db.execute_query(
                 "SELECT id, start_time FROM event_sessions WHERE end_time IS NULL"
             )
@@ -384,23 +357,19 @@ class EventSessionManager:
                 session_id = session['id']
                 start_time_str = session['start_time']
                 
-                # Parse start time
                 try:
                     start_time = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
                     start_timestamp = start_time.timestamp()
                 except:
                     start_timestamp = time.time()
                 
-                # Calculate duration as time since start
                 duration = int(time.time() - start_timestamp)
                 end_time = datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d %H:%M:%S")
                 
-                # Get object count for description
                 objects = self.db.get_event_objects(session_id)
                 object_count = len(set(obj['object_name'] for obj in objects))
                 description = self._generate_event_description(object_count)
                 
-                # Update session
                 self.db.end_event_session(session_id, end_time, duration)
                 self.db.execute_update(
                     'UPDATE event_sessions SET description = ? WHERE id = ?',
@@ -413,5 +382,4 @@ class EventSessionManager:
             self.logger.error(f"Error fixing orphaned sessions: {e}")
 
 
-# Global session manager instance
 session_manager = EventSessionManager()

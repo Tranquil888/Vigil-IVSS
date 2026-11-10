@@ -45,7 +45,6 @@ class EventLogger:
                 )
             ''')
             
-            # Create indexes for better performance
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_timestamp ON events(timestamp)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_event_type ON events(event_type)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_object_name ON events(object_name)')
@@ -302,11 +301,9 @@ class EventLogger:
             connection = sqlite3.connect(self.db_path)
             cursor = connection.cursor()
             
-            # Total events
             cursor.execute("SELECT COUNT(*) FROM events")
             total_events = cursor.fetchone()[0]
             
-            # Events by type
             cursor.execute('''
                 SELECT event_type, COUNT(*) as count 
                 FROM events 
@@ -315,7 +312,6 @@ class EventLogger:
             ''')
             events_by_type = dict(cursor.fetchall())
             
-            # Events by object
             cursor.execute('''
                 SELECT object_name, COUNT(*) as count 
                 FROM events 
@@ -326,7 +322,6 @@ class EventLogger:
             ''')
             events_by_object = dict(cursor.fetchall())
             
-            # Recent events (last 24 hours)
             cursor.execute('''
                 SELECT COUNT(*) FROM events 
                 WHERE timestamp >= datetime('now', '-24 hours')
@@ -413,5 +408,4 @@ class EventLogger:
             return False
 
 
-# Global event logger instance
 event_logger = EventLogger()

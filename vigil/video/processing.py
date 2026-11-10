@@ -22,7 +22,6 @@ class FrameProcessor:
     def _load_processing_settings(self) -> None:
         """Load processing settings from configuration."""
         try:
-            # Get streaming resolution and quality
             stream_setting = settings.get_setting('stream_res_qua', '704,90')
             if ',' in stream_setting:
                 resolution, quality = stream_setting.split(',', 1)
@@ -110,10 +109,8 @@ class FrameProcessor:
             Processed frame as JPEG bytes
         """
         try:
-            # Resize frame
             resized_frame = self.resize_frame(frame)
             
-            # Encode to JPEG
             encoded_frame = self.encode_frame(resized_frame)
             
             return encoded_frame
@@ -173,20 +170,15 @@ class FrameProcessor:
             List of bounding boxes for motion areas
         """
         try:
-            # Convert to grayscale
             gray1 = cv2.cvtColor(frame1, cv2.COLOR_BGR2GRAY)
             gray2 = cv2.cvtColor(frame2, cv2.COLOR_BGR2GRAY)
             
-            # Calculate difference
             diff = cv2.absdiff(gray1, gray2)
             
-            # Apply threshold
             _, thresh = cv2.threshold(diff, threshold, 255, cv2.THRESH_BINARY)
             
-            # Find contours
             contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             
-            # Get bounding boxes
             motion_areas = []
             for contour in contours:
                 if cv2.contourArea(contour) > 500:  # Minimum area threshold
@@ -303,5 +295,4 @@ class FrameProcessor:
             return False
 
 
-# Global frame processor instance
 frame_processor = FrameProcessor()
