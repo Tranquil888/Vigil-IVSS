@@ -1,6 +1,6 @@
 import numpy as np
 
-from vigil.analysis.motion import MotionDetector
+from vigil.analysis.motion import MotionDetector, MotionResult
 from vigil.config.models import MotionConfig
 
 
@@ -58,6 +58,7 @@ def test_motion_ends_after_cooldown_without_changes():
     detector = make_detector(min_duration_frames=2, cooldown_s=0.3)
     frames = [still_frame() for _ in range(6)]
     frames += [frame_with_box(20 + index * 8) for index in range(8)]
+    frames += [still_frame() for _ in range(15)]
     results = feed(detector, frames)
 
     assert any(result.triggered for result in results)
@@ -88,3 +89,35 @@ def test_reset_clears_the_background_model():
     detector.reset()
     result = detector.update(still_frame(), 5.0)
     assert result.active in (True, False)
+
+class FakeDetector:
+    def update(self, image, now):
+        return MotionResult(active=True, triggered=True, zones=["all"])
+
+
+def test_motion_worker_reports_a_trigger():
+    import time
+
+    from vigil.analysis.motion import MotionWorker
+    from vigil.core.queues import DropOldestQueue
+    from vigil.core.records import Frame
+
+    queue = DropOldestQueue(2)
+    seen = []
+    worker = MotionWorker(
+        camera_id="front",
+        queue=queue,
+        config=MotionConfig(),
+        zones=[],
+        on_result=lambda camera_id, result, frame: seen.append((camera_id, result.triggered)),
+        detector_factory=lambda *args: FakeDetector(),
+    )
+    worker.start()
+    try:
+        queue.put(Frame("front", 1, 0.0, 0.0, still_frame(), 160, 120))
+        deadline = time.monotonic() + 2
+        while not seen and time.monotonic() < deadline:
+            time.sleep(0.01)
+    finally:
+        worker.stop()
+    assert seen == [("front", True)]

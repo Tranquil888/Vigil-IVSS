@@ -7,8 +7,10 @@ from typing import Callable, Dict, List, Optional
 
 from ..config.models import CameraConfig, VigilConfig
 from ..core.queues import DropOldestQueue, LatestFrame
+from ..core.records import EventRecord, EventType
 from .capture import CameraSupervisor
 from .source import FrameSource, OpenCVSource
+from ..analysis.motion import MotionWorker
 
 
 class CameraManager:
@@ -25,6 +27,7 @@ class CameraManager:
         self._motion_queues: Dict[str, DropOldestQueue] = {}
         self._motion_active: Dict[str, threading.Event] = {}
         self._supervisors: List[CameraSupervisor] = []
+        self._motion_workers: List[MotionWorker] = []
 
         for camera in config.cameras:
             if not camera.enabled:
@@ -32,6 +35,17 @@ class CameraManager:
             self._display[camera.id] = LatestFrame()
             self._motion_queues[camera.id] = DropOldestQueue(2)
             self._motion_active[camera.id] = threading.Event()
+            motion_config = config.motion_for(camera)
+            if motion_config.enabled:
+                self._motion_workers.append(
+                    MotionWorker(
+                        camera_id=camera.id,
+                        queue=self._motion_queues[camera.id],
+                        config=motion_config,
+                        zones=camera.zones,
+                        on_result=self._on_motion,
+                    )
+                )
             factory = source_factory or _default_factory(config)
             self._supervisors.append(
                 CameraSupervisor(
@@ -65,7 +79,23 @@ class CameraManager:
         else:
             event.clear()
 
+    def _on_motion(self, camera_id: str, result, frame) -> None:
+        self.set_motion_active(camera_id, result.active)
+        if result.triggered and self.bus is not None:
+            self.bus.publish(
+                EventRecord(
+                    camera_id=camera_id,
+                    type=EventType.MOTION,
+                    ts_start=frame.wall_time,
+                    ts_end=frame.wall_time,
+                    zone=result.zones[0] if result.zones else None,
+                    detail={"changed_pct": round(result.changed_pct, 2)},
+                )
+            )
+
     def start_all(self) -> None:
+        for worker in self._motion_workers:
+            worker.start()
         for supervisor in self._supervisors:
             supervisor.start()
 
@@ -77,6 +107,8 @@ class CameraManager:
     def stop_all(self, timeout: float = 5.0) -> None:
         for supervisor in self._supervisors:
             supervisor.stop(timeout=timeout / max(1, len(self._supervisors)))
+        for worker in self._motion_workers:
+            worker.stop(timeout=timeout / max(1, len(self._motion_workers)))
 
     def stats(self) -> List[dict]:
         return [supervisor.stats() for supervisor in self._supervisors]
