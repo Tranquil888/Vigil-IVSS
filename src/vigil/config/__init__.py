@@ -1,0 +1,43 @@
+from .loader import (
+    ConfigError,
+    deep_merge,
+    default_config_path,
+    defaults_dict,
+    load_config,
+    resolve_data_dir,
+    save_config,
+)
+from .models import (
+    AppConfig,
+    CameraConfig,
+    CaptureConfig,
+    DisplayConfig,
+    FaceConfig,
+    InferenceConfig,
+    MotionConfig,
+    NotifyConfig,
+    StorageConfig,
+    VigilConfig,
+    ZoneConfig,
+)
+
+__all__ = [
+    "AppConfig",
+    "CameraConfig",
+    "CaptureConfig",
+    "ConfigError",
+    "DisplayConfig",
+    "FaceConfig",
+    "InferenceConfig",
+    "MotionConfig",
+    "NotifyConfig",
+    "StorageConfig",
+    "VigilConfig",
+    "ZoneConfig",
+    "deep_merge",
+    "default_config_path",
+    "defaults_dict",
+    "load_config",
+    "resolve_data_dir",
+    "save_config",
+]
