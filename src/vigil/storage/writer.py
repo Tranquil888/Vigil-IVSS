@@ -155,6 +155,8 @@ class DBWriterThread(threading.Thread):
     def stop(self, timeout: float = 5.0) -> None:
         self._stop_event.set()
         self._queue.close()
+        if not self.is_alive():
+            return
         self.join(timeout)
         if self.is_alive():
             log.warning("db writer did not stop in time", extra={"event": "db.stop_timeout"})

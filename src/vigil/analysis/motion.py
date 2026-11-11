@@ -210,4 +210,6 @@ class MotionWorker(threading.Thread):
 
     def stop(self, timeout: float = 5.0) -> None:
         self._stop_event.set()
+        if not self.is_alive():
+            return
         self.join(timeout)

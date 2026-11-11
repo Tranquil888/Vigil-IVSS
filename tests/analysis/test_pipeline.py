@@ -5,7 +5,7 @@ from vigil.analysis.pipeline import InferenceWorker, OverlayStore
 from vigil.analysis.unknowns import StrangerGrouper
 from vigil.config.models import FaceConfig, VigilConfig
 from vigil.core.records import Frame, OverlayItem
-from vigil.support import FakeBackend, unit
+from tests.support import FakeBackend, unit
 
 
 class RecordingBus:
@@ -113,6 +113,7 @@ def test_stop_finalises_open_tracklets():
     gallery.add(1, unit([1, 0, 0]))
     worker, bus = make_worker(FakeBackend(vector=[1, 0, 0]), gallery=gallery)
     worker.process(frame(0, 0.0))
+    worker.process(frame(1, 0.2))
     worker.stop()
     assert len(bus.records) == 1
     assert bus.records[0].type == "known_face"

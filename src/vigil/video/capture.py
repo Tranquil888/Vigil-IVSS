@@ -223,6 +223,8 @@ class CameraSupervisor(threading.Thread):
 
     def stop(self, timeout: float = 5.0) -> None:
         self._stop_event.set()
+        if not self.is_alive():
+            return
         self.join(timeout)
         if self.is_alive():
             log.warning(

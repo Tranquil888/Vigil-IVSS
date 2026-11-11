@@ -17,6 +17,7 @@ Rect = Tuple[int, int, int, int]
 CNN_MODEL = "mmod_human_face_detector.dat"
 SHAPE_MODEL = "shape_predictor_68_face_landmarks.dat"
 FACE_MODEL = "dlib_face_recognition_resnet_model_v1.dat"
+MODEL_ID = "dlib_resnet_v1"
 
 log = logging.getLogger(__name__)
 
