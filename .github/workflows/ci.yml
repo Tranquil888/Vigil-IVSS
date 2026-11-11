@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+
+jobs:
+  cpu-tests:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: ["3.12", "3.9"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest -q
+
+      - name: Import smoke test
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -c "import vigil, vigil.config, vigil.core; print(vigil.__version__)"

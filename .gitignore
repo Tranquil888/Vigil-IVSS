@@ -192,10 +192,8 @@ REFACTORING_SUMMARY.md
 # Documentation files
 **/AGENTS.MD
 
-# Test files
-test_*.py
+# Scratch files
 debug_*.py
-*_test.py
 *_debug.py
 
 #Other
