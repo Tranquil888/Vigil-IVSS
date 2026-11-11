@@ -67,7 +67,10 @@ def test_duplicate_dedupe_key_is_inserted_once(tmp_path):
 
 def test_writer_stores_tracklet_attached_to_event(tmp_path):
     db = tmp_path / "vigil.db"
-    create_schema(make_engine(db))
+    engine = create_schema(make_engine(db))
+    from .conftest import seed_person
+
+    seed_person(engine, 3, "Cara")
     bus = EventBus()
     writer = DBWriterThread(bus, db)
     writer.start()
