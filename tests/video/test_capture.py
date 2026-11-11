@@ -67,7 +67,7 @@ def test_display_gets_every_frame_and_inference_is_sampled():
     assert not supervisor.is_alive()
     assert display.generation == 60
     # 60 frames at 30 fps over 2 s, sampled at 5 fps.
-    assert 8 <= inference.qsize() + 0 <= 12
+    assert 8 <= supervisor.stats()["inference_sent"] <= 12
 
 
 def test_supervisor_keeps_trying_after_open_failures():
