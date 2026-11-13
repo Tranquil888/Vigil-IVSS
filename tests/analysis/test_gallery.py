@@ -46,3 +46,17 @@ def test_scores_are_sorted_by_distance():
     gallery.add(2, unit([0, 1, 0]))
     scores = gallery.score(unit([0.9, 0.1, 0]))
     assert [score.person_id for score in scores] == [1, 2]
+
+
+def test_replace_swaps_the_whole_gallery_in_one_step():
+    gallery = Gallery({1: np.atleast_2d(unit([1, 0, 0]))})
+    gallery.replace({2: np.atleast_2d(unit([0, 1, 0]))})
+
+    assert gallery.person_ids() == [2]
+    assert gallery.score(unit([1, 0, 0]))[0].person_id == 2
+
+
+def test_replace_with_an_empty_gallery_leaves_nothing_to_score():
+    gallery = Gallery({1: np.atleast_2d(unit([1, 0, 0]))})
+    gallery.replace({})
+    assert gallery.score(unit([1, 0, 0])) == []

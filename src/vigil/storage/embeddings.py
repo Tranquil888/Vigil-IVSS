@@ -9,7 +9,7 @@ import numpy as np
 from sqlalchemy import delete, select
 from sqlalchemy.engine import Engine
 
-from .schema import embedding
+from .schema import embedding, person
 
 
 def to_blob(vector: np.ndarray) -> bytes:
@@ -67,11 +67,15 @@ class EmbeddingStore:
                 )
 
     def gallery(self, model_id: str) -> Dict[int, np.ndarray]:
+        """Only enabled people are matched, so disabling a person takes effect on rebuild."""
         grouped: Dict[int, list] = defaultdict(list)
         with self.engine.connect() as conn:
             rows = conn.execute(
-                select(embedding.c.person_id, embedding.c.vector).where(
-                    embedding.c.model_id == model_id
+                select(embedding.c.person_id, embedding.c.vector)
+                .join(person, person.c.id == embedding.c.person_id)
+                .where(
+                    embedding.c.model_id == model_id,
+                    person.c.enabled == 1,
                 )
             )
             for person_id, blob in rows:

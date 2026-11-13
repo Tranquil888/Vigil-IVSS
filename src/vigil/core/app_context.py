@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import shutil
 import threading
 import time
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
+import cv2
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from ..analysis.backend import MODEL_ID, DlibBackend
@@ -17,9 +20,10 @@ from ..analysis.unknowns import StrangerGrouper
 from ..config.models import VigilConfig
 from .bus import EventBus
 from ..notify.notifier import Notifier
-from ..paths import data_dir, db_path, models_dir, snapshots_dir
+from ..paths import data_dir, db_path, models_dir, people_dir, snapshots_dir
 from ..storage.db import Database
 from ..storage.embeddings import EmbeddingStore
+from ..storage.people import PeopleStore
 from ..storage.reader import Reader
 from ..storage.schema import camera as camera_table
 from ..storage.snapshots import SnapshotStore
@@ -60,10 +64,12 @@ class AppContext:
 
         people = self.reader.people()
         self.names: Dict[int, str] = {int(row["id"]): row["name"] for row in people}
+        self.embeddings = EmbeddingStore(self.database.engine)
+        self.people_store = PeopleStore(self.database.engine)
         if gallery is not None:
             self.gallery = gallery
         else:
-            self.gallery = Gallery(EmbeddingStore(self.database.engine).gallery(MODEL_ID))
+            self.gallery = Gallery(self.embeddings.gallery(MODEL_ID))
 
         if backend is not None:
             self.backend = backend
@@ -150,6 +156,60 @@ class AppContext:
         self.overlays.clear()
         self.reader.close()
         self.database.close()
+
+    def set_toast_callback(
+        self, callback: Optional[Callable[[str, str], None]]
+    ) -> None:
+        self.notifier.set_toast_callback(callback)
+
+    def rebuild_gallery(self) -> int:
+        vectors = self.embeddings.gallery(MODEL_ID)
+        self.gallery.replace(vectors)
+        return len(vectors)
+
+    def remember_person(self, person_id: int, name: Optional[str]) -> None:
+        """Keep the shared name map in step with people edits, for live lookups."""
+        if name is None:
+            self.names.pop(int(person_id), None)
+        else:
+            self.names[int(person_id)] = name
+
+    def add_person_photo(self, person_id: int, path: Path) -> Tuple[bool, str]:
+        if not getattr(self.backend, "can_embed", False):
+            return (
+                False,
+                "The recognition model is not available, so no embedding was added.",
+            )
+        image = cv2.imread(str(path))
+        if image is None:
+            return False, "That file could not be read as an image."
+        try:
+            rects = self.backend.detect(image)
+        except Exception as err:
+            return False, "Face detection failed: %s" % err
+        if not rects:
+            return False, "No face was found in that photo."
+        largest = max(rects, key=lambda rect: int(rect[2]) * int(rect[3]))
+        try:
+            vector = self.backend.embed(image, largest)
+        except Exception as err:
+            return False, "The face could not be embedded: %s" % err
+        if vector is None:
+            return False, "The recognition model returned no embedding."
+
+        payload = Path(path).read_bytes()
+        digest = hashlib.sha256(payload).hexdigest()
+        directory = people_dir(self.config, self.data_path)
+        directory.mkdir(parents=True, exist_ok=True)
+        suffix = Path(path).suffix.lower() or ".jpg"
+        target = directory / ("person-%d-%s%s" % (person_id, digest[:12], suffix))
+        shutil.copyfile(path, target)
+        image_id = self.people_store.add_image(
+            person_id, str(target), digest, quality=float(largest[2] * largest[3])
+        )
+        self.embeddings.add(person_id, image_id, MODEL_ID, vector)
+        self.rebuild_gallery()
+        return True, "Photo added and the gallery was rebuilt."
 
     def stats(self) -> dict:
         return {

@@ -55,6 +55,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     window = MainWindow(context, config)
     if not config.app.start_minimized:
         window.show()
+        application.processEvents()
     context.start()
 
     try:

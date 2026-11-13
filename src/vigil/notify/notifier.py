@@ -120,6 +120,9 @@ class Notifier(threading.Thread):
             "queued": self._queue.qsize() if self._queue is not None else 0,
         }
 
+    def set_toast_callback(self, callback: Optional[Callable[[str, str], None]]) -> None:
+        self._toast = callback
+
     # -- internals -----------------------------------------------------
 
     def _compose(self, record: EventRecord) -> Tuple[str, str]:

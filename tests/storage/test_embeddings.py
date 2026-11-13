@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from vigil.storage.embeddings import EmbeddingStore
-from vigil.storage.schema import create_schema, make_engine
+from vigil.storage.schema import create_schema, make_engine, person
 
 from .conftest import seed_person
 
@@ -44,3 +44,13 @@ def test_remove_person_clears_embeddings(store):
 def test_gallery_ignores_other_models(store):
     store.add(1, None, "dlib_resnet", np.zeros(128, dtype=np.float32))
     assert store.gallery("arcface") == {}
+
+
+def test_gallery_skips_people_who_are_disabled(store):
+    store.add(1, None, "dlib_resnet", np.zeros(128, dtype=np.float32))
+    store.add(2, None, "dlib_resnet", np.ones(128, dtype=np.float32))
+    with store.engine.begin() as conn:
+        conn.execute(person.update().where(person.c.id == 2).values(enabled=0))
+
+    gallery = store.gallery("dlib_resnet")
+    assert sorted(gallery) == [1]
