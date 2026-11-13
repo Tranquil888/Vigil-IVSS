@@ -42,3 +42,21 @@ Runtime for verification: conda env dlib-cuda via dlib-env\Scripts\python.exe (C
   - Ruling: E2E tests carry the `e2e` marker so `pytest -m e2e` runs only the real-thread paths. The full suite is 166 passed on CPython 3.9.23.
   - Open gaps are listed as MVP blockers in `docs/plan-gap-analysis.md`: one event per unknown visit, event retention pruning, automatic CUDA fallback and cuDNN probe, diagnostics page, keyring secrets, clean-VM and reference-GPU builds, installer, and the four-camera hardware run.
 
+## Blocker pass (2026-11-13)
+
+- Photo import: `AppContext.add_person_photo` stores the photo before an embedding exists, deduplicates by SHA-256, and adds the vector when the backend can embed. `rebuild_embeddings` fills missing vectors and the People page reports added, already indexed, failed, and gallery counts.
+  - Ruling: the photo is the durable asset and the embedding is derived data. An operator who imports the gallery before installing the models should not have to import it again.
+- Stranger classification: a tracklet from a detection-only backend, or one with no gallery evidence, produces a `stranger` event and an `Unknown` overlay. It is no longer `uncertain` just because embedding was unavailable.
+- Live config apply: `AppContext.apply_config` rebuilds capture and motion workers only when the camera or motion signature changes, resizes the inference queue and sampler in place, reloads the backend when the detector, device, model directory, or detect side changes, and shares the name map with the notifier. `reload_config` re-reads the TOML file from the Diagnostics page.
+  - Ruling: two in-place rebuilds were rejected. Replacing the manager object would orphan the GUI's queue references, and setting individual config fields on running workers would leave cross-section validation and nested objects half applied.
+- One row per unknown visit: every tracklet in a grouper cluster shares a `stranger` dedupe key, the writer extends the existing `event.ts_end`, and `unknown_cluster.n_visits` is incremented. Cluster ids are seeded from the database at startup.
+- Retention: `DBWriterThread` prunes events, orphan tracklets, clusters, snapshots, and notifications at startup and once per hour, then deletes the released snapshot files.
+- Backend fallback: `probe_backend` reports `cudnn` and forces HOG when CUDA, cuDNN, or the CNN file is missing, with the reason in the status bar and Diagnostics page.
+- Diagnostics: `src/vigil/diagnostics.py` builds the report, the shell has a sixth page with Copy report and Reload config, and `scripts/graybox_probe.py` prints the same report with an optional live run.
+- Verification: the full suite ends at `189 passed` in 21.28 s on CPython 3.9.23, including the reload, global motion rebuild, live grouper, retention, merge, photo import, and backend fallback tests.
+  - CNN smoke test: `DlibBackend(models, detector="dlib_cnn")` reports CUDA and cuDNN true, detector `dlib_cnn`, and a `(128,)` embedding.
+  - Dataset smoke test: 2 people, 8 images, 5 embeddings, 3 skipped with no face, top-1 4/5 (80%), genuine mean 0.196, impostor min 0.454. `known_threshold = 0.6` accepts every measured impostor, so this is a calibration warning, not a production threshold.
+  - Gray-box probe: 4 second synthetic run, 5 live threads, inference frames advance, queue returns to zero, `dlib_cnn` selected with CUDA and cuDNN.
+- Remaining: keyring or DPAPI camera secrets, clean-VM CPU bundle, CUDA bundle on the RTX 3050, installer and portable zip, four-camera hardware run, and a dataset large enough to calibrate thresholds.
+- Ruling: `models/` is gitignored. The three files are fetched, not redistributed, and the local copy is about 123 MB.
+

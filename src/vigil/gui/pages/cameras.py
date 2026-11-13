@@ -32,6 +32,7 @@ class CamerasPage(Page):
         context,
         config_path: Path,
         parent: Optional[QWidget] = None,
+        on_applied=None,
     ) -> None:
         super().__init__(
             "Cameras",
@@ -43,6 +44,7 @@ class CamerasPage(Page):
         self.context = context
         self.config = context.config
         self.config_path = Path(config_path)
+        self.on_applied = on_applied
         self._rows = []
         self._selected: Optional[CameraConfig] = None
 
@@ -227,7 +229,19 @@ class CamerasPage(Page):
             save_config(self.config_path, self.config)
         except Exception as err:
             return False, "Could not write the config: %s" % err
-        return True, "Saved. Restart Vigil to apply camera changes."
+        apply_config = getattr(self.context, "apply_config", None)
+        if not callable(apply_config):
+            return True, "Saved. The running app was not changed."
+        try:
+            summary = apply_config()
+        except Exception as err:
+            return False, "Saved, but the running app was not changed: %s" % err
+        if callable(self.on_applied):
+            self.on_applied()
+        active = int(summary.get("cameras", 0))
+        if active == 0:
+            return True, "Saved and applied. No cameras are enabled."
+        return True, "Saved and applied. %d camera(s) running." % active
 
     def _report(self, ok: bool, message: str) -> None:
         self.status_label.setObjectName("Muted" if ok else "Danger")

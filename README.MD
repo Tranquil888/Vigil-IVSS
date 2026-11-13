@@ -19,13 +19,18 @@ SQLite, packaged as a single process with background workers.
 - Tracklet decisions: a person is reported only after several observations
   agree, not after one lucky frame.
 - Event log with camera, type, person, zone, score, and snapshot.
-- People gallery with photo import, enable/disable, and an embedding
-  rebuild that takes effect without a restart.
-- Grouping of repeated unknown visitors into clusters.
+- People gallery with photo import that works even before the models are
+  installed, enable/disable, and an embedding rebuild that fills missing
+  vectors and takes effect without a restart.
+- Grouping of repeated unknown visitors into clusters, with one event row per
+  visit.
 - Desktop tray notifications for known people and strangers, with a
   cooldown.
 - TOML configuration through `%APPDATA%\Vigil\config.toml` and the
-  Settings page.
+  Settings page. Camera, motion, zone, and inference edits apply without an
+  application restart.
+- A Diagnostics page with backend state, model presence, queue depth, thread
+  liveness, database counts, and a config reload button.
 - A developer JSON log with credentials, embeddings, and image bytes
   redacted.
 
@@ -112,7 +117,9 @@ The installed console script `vigil` runs the same entry point.
    an empty camera list.
 2. Check the status bar at the bottom of the window. It reports the face
    backend and whether it runs on CPU or GPU. If the models are missing, the
-   status says so and recognition is disabled; motion events still work.
+   status says so and recognition is disabled; motion events still work. The
+   Diagnostics page has the same information in full, plus queue depth, thread
+   liveness, and database counts.
 3. Open Cameras and add your first camera.
 4. Open People and add someone, then import one or more photos of them.
 5. Watch the Live page. A recognized face appears with a name; a stranger
@@ -143,8 +150,13 @@ letters, digits, `_`, `-`), a display name, and a source:
 - `"rtsp://user:password@192.168.1.10:554/stream2"` for RTSP.
 - A file path for a recorded clip.
 
-Camera, motion, zone, and inference changes apply after a restart. Adding a
-person, importing a photo, or disabling a person takes effect immediately.
+Camera, motion, zone, and inference changes apply when you save. A camera or
+motion change rebuilds the capture and motion workers, and the live tiles come
+back on the new cameras. An analysis fps or queue size change is applied in
+place. A detector, device, or model directory change reloads the face backend.
+If you edit `config.toml` outside the app, use Reload config on the Diagnostics
+page. Adding a person, importing a photo, or disabling a person takes effect
+immediately.
 
 Each camera can override the global motion section with `[cameras.motion]`
 and define polygon zones:
@@ -167,9 +179,12 @@ analysis frame rate.
 
 ## People and recognition
 
-Open People, add a person, and import photos. Each photo is detected and
-embedded immediately. The gallery is rebuilt from enabled people only, so
-disabling a person removes them from matching without deleting their data.
+Open People, add a person, and import photos. A photo is copied into the
+person folder even when the model files are not installed yet. If the backend
+can embed it, the embedding is written immediately and the gallery is rebuilt
+from enabled people only. If it cannot, the photo stays on file and a later
+Rebuild embeddings fills in the missing vector. Disabling a person removes them
+from matching without deleting their data.
 
 The defaults are a starting point, not a guarantee:
 
@@ -195,9 +210,15 @@ python scripts\fetch_models.py --dest "$env:LOCALAPPDATA\Vigil\models"
 ```
 
 The script checks decompressed sizes and refuses to overwrite existing files
-without `--force`. Vigil never downloads models at run time. If a file is
-missing, the backend degrades in a visible way instead of failing at the
-first frame.
+without `--force`. It retries with `curl` when the Python TLS stack cannot reach
+dlib.net. Vigil never downloads models at run time. If a file is missing, the
+backend degrades in a visible way instead of failing at the first frame. A
+`models` folder in the repository root is ignored by git and is a convenient
+target when running from a checkout.
+
+The Diagnostics page shows which files are present, whether CUDA and cuDNN are
+available, and which detector is actually in use. A CNN request falls back to
+HOG when CUDA, cuDNN, or the CNN file is missing, and the page says why.
 
 ## Configuration
 
@@ -215,6 +236,32 @@ fields are hidden behind the Advanced checkbox.
 - `[notify]`: desktop toasts and stranger cooldown.
 - `[capture]`: open timeout, stall timeout, exponential backoff.
 - `[storage]`: data directory, retention, snapshot quality.
+
+## Diagnostics
+
+The Diagnostics page is a live, read-only report. It refreshes every 2.5
+seconds while it is open and shows:
+
+- Paths for the database, models, people photos, and snapshots.
+- Which of the three model files are present.
+- Detector, CUDA, cuDNN, embedding availability, and the backend reason.
+- Event, notification, person, snapshot, and unknown cluster counts.
+- Thread liveness, per-camera state, queue depth, and drops.
+
+Copy report puts the same text on the clipboard for a support note. Reload
+config re-reads the TOML file, applies it to the workers, and refreshes the
+Settings and Cameras editors. Use it after editing the file outside the app.
+
+The same report is available without the GUI:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\graybox_probe.py --json
+.\.venv\Scripts\python.exe scripts\graybox_probe.py --run 30 --fake-camera
+```
+
+The second form starts the real workers against a synthetic camera, so the
+queue and thread numbers are live. `docs/graybox-test-plan.md` lists the pass
+criteria.
 
 ## Build a bundle
 
@@ -236,8 +283,27 @@ build result on this machine and the Qt/ICU note.
 
 The suite covers config, queues, storage, capture backoff, motion zones,
 tracking, decisions, unknown grouping, the pipeline, the notifier, the GUI
-pages, and the display latency invariant. GUI tests run with
+pages, live config apply, and the display latency invariant. GUI tests run with
 `QT_QPA_PLATFORM=offscreen`.
+
+The CNN and ResNet files are checked only when they are present:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests\analysis\test_models.py -q -m models
+```
+
+Recognition quality against a folder-per-person dataset:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\eval_recognition.py --dataset data\dataset `
+    --models models --limit-per-person 8 --require-cnn
+```
+
+A live gray-box report from a synthetic camera:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\graybox_probe.py --run 30 --fake-camera
+```
 
 End-to-end tests live in `tests/e2e`. They use a synthetic burned-clock video,
 real threads, and a real SQLite file, and need no camera or GPU:
@@ -246,8 +312,9 @@ real threads, and a real SQLite file, and need no camera or GPU:
 .\.venv\Scripts\python.exe -m pytest tests\e2e -q -m e2e
 ```
 
-The automated coverage, the manual hardware matrix, and the current blockers
-are in `docs/e2e-test-plan.md`. The comparison against the build plan is in
+The automated coverage, the gray-box checks, the manual hardware matrix, and
+the current blockers are in `docs/e2e-test-plan.md` and
+`docs/graybox-test-plan.md`. The comparison against the build plan is in
 `docs/plan-gap-analysis.md`.
 
 Source layout:
@@ -262,8 +329,9 @@ src/vigil/
   storage/    schema, writer, reader, embeddings, people, snapshots
   telemetry/  redaction, rotating JSON log
   video/      sources, capture supervisor, camera manager
+  diagnostics.py  shared runtime report for the page and the probe
 tools/        latency harness
-scripts/      environment, model fetch, build
+scripts/      environment, model fetch, gray-box probe, recognition eval, build
 packaging/    PyInstaller spec and entry point
 legacy/       the old tkinter application, kept for reference
 ```
@@ -273,13 +341,21 @@ legacy/       the old tkinter application, kept for reference
 `docs/models.md` explains the three model files.
 `docs/latency.md` explains the display measurement.
 `docs/e2e-test-plan.md` explains the end-to-end suite and the manual gates.
+`docs/graybox-test-plan.md` explains the queue, thread, database, backend, live
+reload, and dataset checks.
 `docs/plan-gap-analysis.md` lists what the build plan still needs.
 
 ## Troubleshooting
 
 **The backend says recognition is disabled.** The shape predictor and ResNet
-files are missing. Run the fetch script and check `face.models_dir`.
-Detection can still work through HOG, but there is nothing to match against.
+files are missing. Run the fetch script and check `face.models_dir`. Detection
+can still work through HOG, but there is nothing to match against. Photos
+imported before the fix are still on disk; open People and press Rebuild
+embeddings to fill in their vectors.
+
+**The status says HOG when I asked for the CNN detector.** The CNN detector
+needs CUDA, cuDNN, and the CNN model file. The Diagnostics page names whichever
+one is missing. On a CPU-only machine HOG is the intended fallback.
 
 **Qt fails with `0xc0000139` at startup in a conda environment.** A conda
 `icuuc.dll` is shadowing a Qt build that needs its own ICU. Install

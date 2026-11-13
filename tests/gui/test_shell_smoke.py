@@ -15,18 +15,31 @@ def build_window(tmp_path):
     return window, context
 
 
-def test_window_has_exactly_five_destinations(qapp, tmp_path):
+def test_window_has_the_expected_destinations(qapp, tmp_path):
     window, _context = build_window(tmp_path)
-    assert len(NAV) == 5
-    assert len(window.nav_buttons) == 5
-    assert len(window.pages) == 5
+    assert len(NAV) == 6
+    assert len(window.nav_buttons) == 6
+    assert len(window.pages) == 6
     assert [button.text() for button in window.nav_buttons] == [
         "Cameras",
         "Live",
         "Events",
         "People",
         "Settings",
+        "Diagnostics",
     ]
+    window._quitting = True
+    window.close()
+
+
+def test_diagnostics_page_reports_paths_and_backend(qapp, tmp_path):
+    window, _context = build_window(tmp_path)
+
+    text = window.diagnostics_page.report()
+
+    assert "Vigil diagnostics" in text
+    assert "models" in text.lower()
+    assert "Backend" in text
     window._quitting = True
     window.close()
 

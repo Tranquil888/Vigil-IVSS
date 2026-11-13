@@ -43,6 +43,11 @@ class StrangerGrouper:
         self._clusters: Dict[int, _Cluster] = {}
         self._next_id = 1
 
+    def configure(self, window_s: float, threshold: float) -> None:
+        """Adopt new grouping limits without losing live clusters or ids."""
+        self.window_s = float(window_s)
+        self.threshold = float(threshold)
+
     def assign(self, camera_id: str, vector: np.ndarray, now: float) -> UnknownAssignment:
         query = _normalize(vector)
         best: Optional[_Cluster] = None
@@ -94,3 +99,7 @@ class StrangerGrouper:
 
     def cluster_count(self) -> int:
         return len(self._clusters)
+
+    def seed_next_id(self, next_id: int) -> None:
+        """Avoid reusing cluster ids that already exist in the database."""
+        self._next_id = max(self._next_id, int(next_id))

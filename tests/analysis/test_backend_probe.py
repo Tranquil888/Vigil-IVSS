@@ -1,5 +1,6 @@
 import pytest
 
+from vigil.analysis import backend as backend_module
 from vigil.analysis.backend import (
     CNN_MODEL,
     SHAPE_MODEL,
@@ -37,6 +38,34 @@ def test_probe_reports_missing_embedding_models(tmp_path):
     status = probe_backend(FaceConfig(detector="dlib_cnn"), tmp_path)
 
     assert status.available is True
-    assert status.detector == "dlib_cnn"
+    assert status.detector in ("dlib_cnn", "dlib_hog")
     assert "recognition is disabled" in status.reason.lower()
     assert SHAPE_MODEL in status.reason
+    assert isinstance(status.cudnn, bool)
+
+
+def test_cnn_falls_back_to_hog_without_cuda(tmp_path, monkeypatch):
+    pytest.importorskip("dlib")
+    monkeypatch.setattr(backend_module, "_cuda_available", lambda dlib: False)
+    monkeypatch.setattr(backend_module, "_cudnn_available", lambda: False)
+    (tmp_path / CNN_MODEL).write_bytes(b"stub")
+
+    status = probe_backend(FaceConfig(detector="dlib_cnn"), tmp_path)
+
+    assert status.detector == "dlib_hog"
+    assert status.cuda is False
+    assert "CUDA is not available" in status.reason
+
+
+def test_cnn_falls_back_to_hog_without_cudnn(tmp_path, monkeypatch):
+    pytest.importorskip("dlib")
+    monkeypatch.setattr(backend_module, "_cuda_available", lambda dlib: True)
+    monkeypatch.setattr(backend_module, "_cudnn_available", lambda: False)
+    (tmp_path / CNN_MODEL).write_bytes(b"stub")
+
+    status = probe_backend(FaceConfig(detector="dlib_cnn"), tmp_path)
+
+    assert status.cuda is True
+    assert status.cudnn is False
+    assert status.detector == "dlib_hog"
+    assert "cuDNN was not found" in status.reason

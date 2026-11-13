@@ -28,31 +28,64 @@ class BackendStatus:
     cuda: bool
     detector: str
     reason: str
+    cudnn: bool = False
+
+
+def _cuda_available(dlib) -> bool:
+    cuda = bool(getattr(dlib, "DLIB_USE_CUDA", False))
+    try:
+        return cuda and int(dlib.cuda.get_num_devices()) > 0
+    except Exception:
+        return False
+
+
+def _cudnn_available() -> bool:
+    """Best-effort probe. dlib has no API, so try the usual library names."""
+    import ctypes
+
+    for name in (
+        "cudnn64_9.dll",
+        "cudnn_ops64_9.dll",
+        "cudnn64_8.dll",
+        "cudnn_ops64_8.dll",
+        "libcudnn.so.9",
+        "libcudnn.so.8",
+        "libcudnn.so",
+    ):
+        try:
+            ctypes.CDLL(name)
+            return True
+        except OSError:
+            continue
+    return False
 
 
 def probe_backend(face: FaceConfig, models_dir: Path) -> BackendStatus:
     if face.detector == "none":
-        return BackendStatus(False, False, "none", "face recognition is disabled in config")
+        return BackendStatus(
+            False, False, "none", "face recognition is disabled in config"
+        )
     try:
         import dlib
     except Exception as err:
         return BackendStatus(False, False, "none", "dlib is not installed: %s" % err)
 
-    cuda = bool(getattr(dlib, "DLIB_USE_CUDA", False))
-    try:
-        cuda = cuda and int(dlib.cuda.get_num_devices()) > 0
-    except Exception:
-        cuda = False
+    cuda = _cuda_available(dlib)
+    cudnn = _cudnn_available() if cuda else False
+    detector = face.detector
+    notes: List[str] = []
 
-    if face.detector == "dlib_cnn":
+    if detector == "dlib_cnn":
         model = Path(models_dir) / CNN_MODEL
-        if not model.exists():
-            return BackendStatus(
-                True,
-                cuda,
-                "dlib_hog",
-                "CNN model missing at %s, using HOG" % model,
-            )
+        if not cuda:
+            detector = "dlib_hog"
+            notes.append("CUDA is not available; the CNN detector needs it, using HOG")
+        elif not cudnn:
+            detector = "dlib_hog"
+            notes.append("cuDNN was not found; the CNN detector needs it, using HOG")
+        elif not model.exists():
+            detector = "dlib_hog"
+            notes.append("CNN model missing at %s, using HOG" % model)
 
     missing = [
         name
@@ -60,19 +93,16 @@ def probe_backend(face: FaceConfig, models_dir: Path) -> BackendStatus:
         if not (Path(models_dir) / name).exists()
     ]
     if missing:
-        return BackendStatus(
-            True,
-            cuda,
-            face.detector,
-            "recognition is disabled, missing %s" % ", ".join(missing),
-        )
+        notes.append("recognition is disabled, missing %s" % ", ".join(missing))
+        return BackendStatus(True, cuda, detector, "; ".join(notes), cudnn)
 
-    return BackendStatus(
-        True,
-        cuda,
-        face.detector,
-        "ready on GPU" if cuda else "dlib is running on CPU",
-    )
+    if cuda and detector == "dlib_cnn":
+        notes.append("ready on GPU")
+    elif cuda:
+        notes.append("HOG detection is CPU based; CUDA is available")
+    else:
+        notes.append("dlib is running on CPU")
+    return BackendStatus(True, cuda, detector, "; ".join(notes), cudnn)
 
 
 class DlibBackend:

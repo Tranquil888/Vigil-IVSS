@@ -61,6 +61,27 @@ class Reader:
                 conn.execute(select(func.count()).select_from(notification)).scalar() or 0
             )
 
+    def count_people(self) -> int:
+        with self.engine.connect() as conn:
+            return int(
+                conn.execute(select(func.count()).select_from(person)).scalar() or 0
+            )
+
+    def count_snapshots(self) -> int:
+        with self.engine.connect() as conn:
+            return int(
+                conn.execute(select(func.count()).select_from(snapshot)).scalar() or 0
+            )
+
+    def count_unknown_clusters(self) -> int:
+        with self.engine.connect() as conn:
+            return int(
+                conn.execute(
+                    select(func.count()).select_from(unknown_cluster)
+                ).scalar()
+                or 0
+            )
+
     def notifications(self, limit: int = 100):
         return self._rows(
             select(notification).order_by(notification.c.created_at.desc()).limit(limit)
@@ -87,6 +108,11 @@ class Reader:
             .order_by(unknown_cluster.c.last_seen.desc())
             .limit(limit)
         )
+
+    def max_unknown_cluster_id(self) -> int:
+        with self.engine.connect() as conn:
+            value = conn.execute(select(func.max(unknown_cluster.c.id))).scalar()
+            return int(value or 0)
 
     def embeddings(self, person_id: int, model_id: Optional[str] = None):
         stmt = select(embedding).where(embedding.c.person_id == person_id)

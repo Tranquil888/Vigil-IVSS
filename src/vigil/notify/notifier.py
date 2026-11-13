@@ -28,7 +28,8 @@ class Notifier(threading.Thread):
         super().__init__(name="vigil-notifier", daemon=True)
         self._config = config or NotifyConfig()
         self._toast = toast_callback
-        self._names = dict(names or {})
+        # Share the map so a rename from the People page reaches notifications.
+        self._names = names if names is not None else {}
         self._clock = clock
         self._queue = bus.subscribe(queue_size) if bus is not None else None
         self._bus = bus
@@ -122,6 +123,9 @@ class Notifier(threading.Thread):
 
     def set_toast_callback(self, callback: Optional[Callable[[str, str], None]]) -> None:
         self._toast = callback
+
+    def set_config(self, config: NotifyConfig) -> None:
+        self._config = config
 
     # -- internals -----------------------------------------------------
 

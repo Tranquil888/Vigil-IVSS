@@ -271,9 +271,35 @@ class SettingsPage(Page):
         except Exception as err:
             self._report(False, "The settings were not saved: %s" % err)
             return
-        self._report(True, "Saved. Camera and inference changes apply after a restart.")
+
+        message = "Saved and applied to the running workers."
+        apply_config = getattr(self.context, "apply_config", None)
+        if callable(apply_config):
+            try:
+                summary = apply_config()
+            except Exception as err:
+                self._report(False, "Saved, but could not apply: %s" % err)
+                return
+            if summary.get("cameras_rebuilt"):
+                message = "Saved and applied. Capture restarted for %d camera(s)." % int(
+                    summary.get("cameras", 0)
+                )
+            if summary.get("backend_rebuilt"):
+                message += " The face backend was reloaded."
+        else:
+            message = "Saved. The running app was not changed."
+
+        self._report(True, message)
         if callable(self.on_saved):
             self.on_saved()
+
+    def reload(self) -> None:
+        """Re-read the live config after an external reload."""
+        for section_name, attribute, row in self._bindings:
+            section = getattr(self.config, section_name)
+            defaults = getattr(self.defaults, section_name)
+            row.default = getattr(defaults, attribute)
+            row.set_value(getattr(section, attribute))
 
     def _report(self, ok: bool, message: str) -> None:
         self.status_label.setObjectName("Muted" if ok else "Danger")

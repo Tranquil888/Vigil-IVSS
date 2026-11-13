@@ -1,4 +1,4 @@
-"""Main window: an 88 px rail, five destinations, and no worker calls."""
+"""Main window: an 88 px rail, six destinations, and no worker calls."""
 
 from __future__ import annotations
 
@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 from ..config.loader import default_config_path
 from ..config.models import VigilConfig
 from .pages.cameras import CamerasPage
+from .pages.diagnostics import DiagnosticsPage
 from .pages.events import EventsPage
 from .pages.live import LivePage
 from .pages.people import PeoplePage
@@ -36,6 +37,7 @@ NAV = [
     ("Events", "list"),
     ("People", "person"),
     ("Settings", "sliders"),
+    ("Diagnostics", "pulse"),
 ]
 
 
@@ -72,6 +74,12 @@ def _nav_pixmap(kind: str, color: str, size: int = 40) -> QPixmap:
         painter.drawEllipse(15, 10, 6, 6)
         painter.drawEllipse(23, 17, 6, 6)
         painter.drawEllipse(16, 24, 6, 6)
+    elif kind == "pulse":
+        painter.drawLine(10, 20, 15, 20)
+        painter.drawLine(15, 20, 18, 13)
+        painter.drawLine(18, 13, 22, 27)
+        painter.drawLine(22, 27, 25, 20)
+        painter.drawLine(25, 20, 30, 20)
 
     painter.end()
     return pixmap
@@ -133,12 +141,14 @@ class MainWindow(QMainWindow):
         self.events_page = EventsPage(context)
         self.people_page = PeoplePage(context)
         self.settings_page = SettingsPage(context, self.config_path)
+        self.diagnostics_page = DiagnosticsPage(context, self.config_path)
         self.pages = [
             self.cameras_page,
             self.live_page,
             self.events_page,
             self.people_page,
             self.settings_page,
+            self.diagnostics_page,
         ]
         for page in self.pages:
             self.stack.addWidget(page)
@@ -182,7 +192,9 @@ class MainWindow(QMainWindow):
         status.addPermanentWidget(self.backend_label)
         self._update_status()
 
-        self.settings_page.on_saved = self.apply_theme_from_config
+        self.cameras_page.on_applied = self.after_config_applied
+        self.settings_page.on_saved = self.apply_config_from_page
+        self.diagnostics_page.config_reloaded.connect(self.after_config_reloaded)
         self.scheme = self._resolved_scheme()
         self.apply_scheme(self.config.app.theme)
         self.set_page(1)
@@ -199,7 +211,7 @@ class MainWindow(QMainWindow):
         index = max(0, min(index, len(self.pages) - 1))
         self.stack.setCurrentIndex(index)
         self.nav_buttons[index].setChecked(True)
-        if index in (1, 2, 3):
+        if index in (1, 2, 3, 5):
             self.pages[index].refresh()
         if index == 1:
             self.live_page.set_mode("grid")
@@ -224,6 +236,21 @@ class MainWindow(QMainWindow):
     def apply_theme_from_config(self) -> None:
         self.apply_scheme(self.config.app.theme)
         self._update_status()
+
+    def after_config_applied(self) -> None:
+        """Refresh the read-only views after a live config change."""
+        self.live_page.refresh()
+        self._update_status()
+
+    def apply_config_from_page(self) -> None:
+        self.apply_theme_from_config()
+        self.after_config_applied()
+
+    def after_config_reloaded(self) -> None:
+        """Rebuild editor widgets after the TOML file was reloaded from disk."""
+        self.settings_page.reload()
+        self.cameras_page.refresh()
+        self.apply_config_from_page()
 
     def apply_scheme(self, scheme: str) -> None:
         self.scheme = scheme if scheme in ("dark", "light") else self._resolved_scheme()
@@ -252,7 +279,8 @@ class MainWindow(QMainWindow):
             reason = getattr(status, "reason", "") or ""
             lowered = reason.lower()
             degraded = any(
-                word in lowered for word in ("missing", "disabled", "not installed")
+                word in lowered
+                for word in ("missing", "disabled", "not installed", "not found")
             )
             if degraded:
                 text = "%s. %s" % (text, reason)

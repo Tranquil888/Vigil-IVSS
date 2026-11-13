@@ -84,6 +84,9 @@ class CameraSupervisor(threading.Thread):
 
     # -- state ---------------------------------------------------------
 
+    def set_analysis_fps(self, analysis_fps: float) -> None:
+        self._sampler.interval = 1.0 / float(analysis_fps)
+
     def _set_state(self, state: CameraState) -> None:
         if state == self.state:
             return

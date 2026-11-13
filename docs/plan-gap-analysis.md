@@ -1,8 +1,9 @@
 # Plan gap analysis
 
 Compared `Vigil_new_plan.md` with the tree at commit `a7c1b05` on
-`feat/3-rewrite-vigil`. The purpose is to separate what the MVP already
-proves, what is only partly built, and what was deliberately changed.
+`feat/3-rewrite-vigil`. Statuses were updated after the blocker pass on
+2026-11-13. The purpose is to separate what the MVP already proves, what is
+only partly built, and what was deliberately changed.
 
 Legend:
 
@@ -24,23 +25,23 @@ display path imports no dlib code. Guarded by
 | Deliverable | State | Evidence and gap |
 |---|---|---|
 | Decoupled capture and display | Done | `video/capture.py`, `core/queues.py`, `gui/widgets/video.py` |
-| dlib CNN plus ResNet, tracklet decisions | Partial | Backend, tracker, and decisions exist. The pipeline embeds every quality-passing observation instead of only the best K. |
+| dlib CNN plus ResNet, tracklet decisions | Done | CNN detector, ResNet embeddings, and tracklet voting verified on the local GPU. Recorded deviation: every quality-passing observation is embedded instead of storing crops for the best K. |
 | Motion zones and MOG2 fallback | Partial | Zones, MOG2, global-change suppression, and cooldown exist. `motion.preroll_s` is a config field with no ring buffer behind it. |
-| Event log and developer log | Partial | SQLite events and a rotating redacted JSON log exist. `storage.event_retention_days` is never applied. |
-| Person dataset and index rebuild | Done | People page, photo import, embeddings, gallery rebuild |
-| Unknown grouping | Partial | The grouper merges similar tracklets, but each tracklet still produces its own event row. The plan asks for one log entry per visit. Clusters live in memory and are only rehydrated when a new cluster row is written. |
-| TOML and Pydantic config | Done | Strict models, defaults, TOML round trip |
-| Five GUI pages | Partial | Pages exist. There is no zone polygon editor, and the camera page does not expose per-camera motion or zone overrides. |
+| Event log and developer log | Done | SQLite events, one row per unknown visit, retention pruning, and a rotating redacted JSON log |
+| Person dataset and index rebuild | Done | People page, photo import that works without models, embeddings, and an embedding rebuild that fills missing vectors |
+| Unknown grouping | Done | The grouper merges similar tracklets, all tracklets in one visit share a dedupe key, and the writer extends one event row instead of adding another |
+| TOML and Pydantic config | Done | Strict models, defaults, TOML round trip, live apply, and reload from disk |
+| Five GUI pages | Deviation | Six pages: Cameras, Live, Events, People, Settings, Diagnostics. There is still no zone polygon editor and the camera page does not expose per-camera motion or zone overrides. |
 | Tray notification and optional sound | Done | `notify/notifier.py`, `gui/tray.py` |
-| PyInstaller `--onedir`, CPU and CUDA builds, first-run probe | Partial | Bundle and scripts exist. No installer, no portable zip, no diagnostics page, and no CUDA build tested on the reference GPU. |
+| PyInstaller `--onedir`, CPU and CUDA builds, first-run probe | Partial | Bundle, scripts, and the Diagnostics page exist. No installer, no portable zip, and no CUDA bundle run on the reference GPU. |
 
 ## 2. Reference hardware and CUDA path
 
 | Item | State | Gap |
 |---|---|---|
 | CUDA 12.9, cuDNN 9, dlib-gpu 20.0.1 cp312 | Partial | Local verification used CPython 3.9.23, dlib 20.0.0, and a CUDA 11 runtime. The release target is not tested. |
-| Startup CUDA probe | Partial | `probe_backend` checks `DLIB_USE_CUDA` and `dlib.cuda.get_num_devices()`. It does not check cuDNN, and it does not switch to HOG or motion-only when CUDA is absent. |
-| Visible warning on CPU fallback | Done | Status bar and settings page show the backend reason in warning color. |
+| Startup CUDA probe | Done | `probe_backend` checks `DLIB_USE_CUDA`, `dlib.cuda.get_num_devices()`, and a best-effort cuDNN library probe. Missing CUDA or cuDNN switches the detector to HOG with a visible reason. |
+| Visible warning on CPU fallback | Done | Status bar and Diagnostics page show the backend reason in warning color. |
 | `inference.device` honored at runtime | Missing | The value is validated but dlib chooses its device from its own build. Documented as intent, not a runtime switch. |
 
 ## 3. Technology stack
@@ -83,12 +84,17 @@ display path imports no dlib code. Guarded by
 | Embed best K observations | Deviation | Every quality-passing observation is embedded immediately; only the best `best_k` votes are kept. Recorded in the ledger. |
 | Euclidean match, min or top-3 mean | Done | `analysis/gallery.py` |
 | Tracklet decision, margin, min votes, uncertain band | Done | `analysis/decisions.py` |
-| Unknown grouping by window and centroid | Partial | Merging works. One event per visit is not enforced. |
+| Unknown grouping by window and centroid | Done | Merging works, one event row per visit, and cluster ids are seeded from the database at startup |
 | No fine-tuning | Done | Embeddings only |
 
 Threshold defaults match the plan, the uncertain band is validated, and
 `docs/calibration.md` documents the calibration procedure. Per-model threshold
-storage is missing: there is no model or calibration table.
+storage is missing: there is no model or calibration table. A smoke evaluation
+on the local dataset produced top-1 4/5 with genuine distances around 0.20 and
+impostor distances around 0.47, so the default `known_threshold = 0.6` accepts
+every measured impostor. The dataset has two people, so this is a warning to
+calibrate, not a replacement for calibration. Numbers and the command are in
+`docs/graybox-test-plan.md`.
 
 ## 6. Motion
 
@@ -107,7 +113,7 @@ depend on the face backend.
 | GUI read-only connection | Done | `storage/reader.py` |
 | Rotating JSON developer log, 10 MB by 5 | Done | `telemetry/logging_setup.py` |
 | Redaction filter and test | Done | `tests/telemetry/test_redaction.py` |
-| 90-day event retention | Missing | The setting is stored but no pruning job reads it. |
+| 90-day event retention | Done | `DBWriterThread` prunes events, orphan tracklets, clusters, snapshots, and notifications at startup and once per hour |
 
 GUI people edits write through `PeopleStore` on the GUI thread. This is a
 recorded ruling and is limited to small user-initiated transactions.
@@ -122,20 +128,21 @@ validated but not editable in the UI, and there is no zone polygon editor.
 
 | Item | State | Gap |
 |---|---|---|
-| Five pages | Done | Cameras, Live, Events, People, Settings |
+| Five pages | Deviation | Six pages: Cameras, Live, Events, People, Settings, Diagnostics. The Diagnostics page was added because backend state and thread liveness were otherwise only in the log. |
 | Window before workers, lazy dlib import | Partial | `app.py` builds `AppContext` before `MainWindow`. That probes dlib and opens the database before the first paint. |
 | `QImage` from the latest frame | Done | `VideoTile` |
 | Overlays with a one-second TTL | Done | `OverlayStore` |
 | No modal dialogs for common actions | Partial | Remove camera and delete person use `QMessageBox.question`. |
 | Dark/light follows the OS | Partial | The setting supports `system`, but the shipped default is `dark`. |
 | No custom skin | Deviation | The operator console has a deliberate dark theme and a teal live accent. |
+| Configuration applies without restart | Done | `AppContext.apply_config` rebuilds only affected workers and the Diagnostics page can reload the TOML file |
 
 ## 10. Packaging
 
-The `--onedir` bundle, CPU and CUDA scripts, explicit CUDA DLL collection, and
-`multiprocessing.freeze_support()` are present. Missing: Inno Setup installer,
-portable zip, first-run diagnostics page, cuDNN probe, a clean-VM test, and a
-CUDA test on the RTX 3050. The local bundle is 927 MB because it pulls CUDA 11
+The `--onedir` bundle, CPU and CUDA scripts, explicit CUDA DLL collection,
+`multiprocessing.freeze_support()`, the Diagnostics page, and the cuDNN probe
+are present. Missing: Inno Setup installer, portable zip, a clean-VM test, and
+a CUDA test on the RTX 3050. The local bundle is 927 MB because it pulls CUDA 11
 cublas DLLs from dlib.
 
 ## 11. Sprint order
@@ -164,20 +171,31 @@ been demonstrated.
 4. Local PySide6 is 6.9.3 to avoid the conda ICU collision.
 5. The GUI has a custom dark operator theme rather than the OS theme alone.
 6. People edits bypass the event writer thread; event writes do not.
+7. Six GUI pages rather than five. The Diagnostics page is an MVP blocker,
+   not a convenience: backend state, queue depth, thread liveness, and a
+   config reload were otherwise only visible in the log.
+8. A person photo is stored even when no model can embed it. The photo is the
+   durable asset and the embedding is derived data, so Rebuild embeddings can
+   fill the vector later without a second import.
+9. A config save applies live by rebuilding only the affected workers. The
+   plan allowed a restart; an operator editing a camera or a threshold should
+   not lose the live view.
 
 ## MVP blockers
 
 These are the gaps that still stop the plan's definition of done:
 
-1. One event row per unknown visit, not one per tracklet.
-2. Event retention pruning.
-3. CUDA absence must visibly fall back to HOG or motion-only, and the probe
-   must report cuDNN state.
-4. First-run diagnostics page.
-5. Camera secrets in the OS keyring or an encrypted fallback.
-6. Verified CPU build on a clean Windows VM and a CUDA build on the RTX 3050.
-7. Installer and portable zip.
-8. Reference-hardware latency run with four 1080p cameras.
+1. Camera secrets in the OS keyring or an encrypted fallback. `cryptography` is
+   installed; `keyring` is not, and the DPAPI design is not chosen.
+2. Verified CPU build on a clean Windows VM and a CUDA bundle run on the
+   RTX 3050.
+3. Installer and portable zip.
+4. Reference-hardware latency run with four 1080p cameras.
+5. Recognition thresholds are not calibrated for production. The current
+   dataset has two people, and `known_threshold = 0.6` accepts every measured
+   impostor.
 
-The end-to-end harness and the manual matrix are in
-`docs/e2e-test-plan.md`.
+The closed blockers, one event per unknown visit, retention pruning, automatic
+CUDA and cuDNN fallback, and the Diagnostics page, have tests or a recorded
+probe run. The gray-box checks and the measured recognition numbers are in
+`docs/graybox-test-plan.md`.

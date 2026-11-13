@@ -97,6 +97,19 @@ class DropOldestQueue:
         with self._condition:
             return len(self._items)
 
+    def resize(self, maxsize: int) -> int:
+        """Change the bound in place, dropping the oldest items if it shrinks."""
+        if maxsize < 1:
+            raise ValueError("maxsize must be at least 1")
+        dropped = 0
+        with self._condition:
+            self.maxsize = int(maxsize)
+            while len(self._items) > self.maxsize:
+                self._items.popleft()
+                dropped += 1
+            self.dropped += dropped
+        return dropped
+
     def close(self) -> None:
         with self._condition:
             self._closed = True

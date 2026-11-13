@@ -41,3 +41,25 @@ def test_new_cluster_is_flagged_as_new():
     grouper = StrangerGrouper(window_s=60, threshold=0.6)
     assert grouper.assign("front", unit([1, 0, 0]), now=1.0).is_new is True
     assert grouper.assign("front", unit([1, 0, 0]), now=2.0).is_new is False
+
+
+def test_configure_keeps_live_clusters_and_ids():
+    grouper = StrangerGrouper(window_s=60, threshold=0.6)
+    first = grouper.assign("front", unit([1, 0, 0]), now=100.0)
+
+    grouper.configure(120.0, 0.5)
+    again = grouper.assign("front", unit([1, 0, 0]), now=130.0)
+
+    assert again.id == first.id
+    assert again.n_visits == 2
+    assert grouper.window_s == 120.0
+    assert grouper.threshold == 0.5
+
+
+def test_seed_next_id_never_reuses_an_existing_cluster():
+    grouper = StrangerGrouper()
+    grouper.seed_next_id(40)
+
+    assignment = grouper.assign("front", unit([1, 0, 0]), now=1.0)
+
+    assert assignment.id == 40

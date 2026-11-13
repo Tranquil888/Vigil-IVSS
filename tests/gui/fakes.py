@@ -118,5 +118,14 @@ class FakeContext:
     def rebuild_gallery(self):
         return len(self.people_store.rows())
 
+    def rebuild_embeddings(self):
+        return {
+            "embedded": 0,
+            "already": 0,
+            "failed": 0,
+            "people": len(self.people_store.rows()),
+            "reason": "",
+        }
+
     def add_person_photo(self, person_id, path):
         return True, "Photo added."

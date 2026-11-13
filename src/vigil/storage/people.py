@@ -90,3 +90,22 @@ class PeopleStore:
                 .order_by(person_image.c.added_at)
             )
             return [dict(row._mapping) for row in rows]
+
+    def all_images(self) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                select(person_image).order_by(person_image.c.person_id, person_image.c.added_at)
+            )
+            return [dict(row._mapping) for row in rows]
+
+    def find_image(self, person_id: int, sha256: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                select(person_image)
+                .where(
+                    person_image.c.person_id == person_id,
+                    person_image.c.sha256 == sha256,
+                )
+                .limit(1)
+            ).first()
+            return dict(row._mapping) if row is not None else None

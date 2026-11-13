@@ -26,7 +26,12 @@ from ..core.records import (
 )
 from ..storage.embeddings import to_blob
 from .backend import MODEL_ID
-from .decisions import ObservationVote, decide_observation, decide_tracklet
+from .decisions import (
+    ObservationVote,
+    TrackletDecision,
+    decide_observation,
+    decide_tracklet,
+)
 from .gallery import Gallery
 from .quality import assess_quality
 from .tracker import IouTracker, Track
@@ -99,6 +104,10 @@ class _TrackState:
     best_image: Any = None
     best_weight: float = 0.0
     embedding: Optional[np.ndarray] = None
+    # Set when the backend can detect faces but cannot embed them. Such a
+    # tracklet has no gallery evidence, so it is a stranger, not an ambiguous
+    # match.
+    detection_only: bool = False
 
 
 class InferenceWorker(threading.Thread):
@@ -130,7 +139,8 @@ class InferenceWorker(threading.Thread):
         self._snapshots = snapshot_store
         self._overlays = overlays or OverlayStore()
         self._cameras = {camera.id: camera for camera in (cameras or [])}
-        self._names = dict(names or {})
+        # Share the map so a rename from the People page reaches live labels.
+        self._names = names if names is not None else {}
         self._clock = clock
         self._trackers: Dict[str, IouTracker] = {}
         self._states: Dict[Tuple[str, int], _TrackState] = {}
@@ -175,7 +185,7 @@ class InferenceWorker(threading.Thread):
         for track in tracks:
             state = self._state_for(frame, track)
             vote = self._observe(frame, state, track)
-            label, kind = self._label(vote)
+            label, kind = self._label(vote, state)
             items.append(
                 OverlayItem(
                     camera_id=frame.camera_id,
@@ -202,6 +212,24 @@ class InferenceWorker(threading.Thread):
         if self.is_alive() and threading.current_thread() is not self:
             self.join(timeout)
         self._finalise_all()
+
+    def set_backend(self, backend) -> None:
+        self._backend = backend
+
+    def reconfigure(self, config: VigilConfig) -> None:
+        """Adopt live config edits. Existing tracklets keep their state."""
+        self._config = config
+        self._face = config.face
+        self._cameras = {camera.id: camera for camera in config.cameras}
+        # Keep the live clusters. Replacing the grouper would restart its id
+        # counter and collide with cluster rows already in the database.
+        self._grouper.configure(
+            self._face.unknown_merge_window_s,
+            self._face.unknown_merge_threshold,
+        )
+        for tracker in self._trackers.values():
+            tracker.iou_threshold = float(self._face.track_iou)
+            tracker.max_gap_s = float(self._face.track_max_gap_s)
 
     def stats(self) -> dict:
         stats = dict(self._counters)
@@ -286,6 +314,7 @@ class InferenceWorker(threading.Thread):
         if quality.face_px < self._face.min_face_px_embed:
             return None
         if self._backend is None or not getattr(self._backend, "can_embed", False):
+            state.detection_only = True
             return None
         try:
             embedding = self._backend.embed(frame.image, track.rect)
@@ -313,8 +342,12 @@ class InferenceWorker(threading.Thread):
             state.embedding = np.asarray(embedding, dtype=np.float32)
         return vote
 
-    def _label(self, vote: Optional[ObservationVote]) -> Tuple[str, str]:
+    def _label(
+        self, vote: Optional[ObservationVote], state: _TrackState
+    ) -> Tuple[str, str]:
         if vote is None:
+            if state.detection_only:
+                return "Unknown", Decision.UNKNOWN
             return "Face", Decision.UNCERTAIN
         if vote.decision == Decision.KNOWN and vote.person_id is not None:
             name = self._names.get(vote.person_id, "Person %d" % vote.person_id)
@@ -339,7 +372,10 @@ class InferenceWorker(threading.Thread):
     def _finalise(self, state: _TrackState, events: List[EventRecord]) -> None:
         if state.observations < self._face.min_tracklet_observations:
             return
-        decision = decide_tracklet(state.votes, self._face)
+        if state.detection_only and not state.votes:
+            decision = TrackletDecision(Decision.UNKNOWN)
+        else:
+            decision = decide_tracklet(state.votes, self._face)
         event_type = _EVENT_TYPES.get(decision.decision)
         if event_type is None:
             return
@@ -375,6 +411,14 @@ class InferenceWorker(threading.Thread):
                 state.camera_id, state.embedding, ended_at
             )
             record.unknown_cluster_id = assignment.id
+            # All tracklets in one visit share a key, so the writer keeps a
+            # single event row and extends its end time instead of adding one
+            # row per tracklet.
+            record.dedupe_key = "stranger:%s:%d:%.3f" % (
+                state.camera_id,
+                assignment.id,
+                assignment.first_seen,
+            )
             if assignment.is_new:
                 detail["unknown_cluster"] = {
                     "first_seen": assignment.first_seen,

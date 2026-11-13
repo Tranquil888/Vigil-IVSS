@@ -82,6 +82,28 @@ class EmbeddingStore:
                 grouped[int(person_id)].append(from_blob(blob))
         return {pid: np.vstack(vectors) for pid, vectors in grouped.items()}
 
+    def image_ids(self, model_id: str) -> set:
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                select(embedding.c.person_image_id).where(
+                    embedding.c.model_id == model_id,
+                    embedding.c.person_image_id.is_not(None),
+                )
+            )
+            return {int(row[0]) for row in rows}
+
+    def has_image(self, person_image_id: int, model_id: str) -> bool:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                select(embedding.c.id)
+                .where(
+                    embedding.c.person_image_id == person_image_id,
+                    embedding.c.model_id == model_id,
+                )
+                .limit(1)
+            ).first()
+            return row is not None
+
     def remove_person(self, person_id: int) -> None:
         with self.engine.begin() as conn:
             conn.execute(delete(embedding).where(embedding.c.person_id == person_id))

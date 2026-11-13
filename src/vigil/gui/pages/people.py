@@ -273,16 +273,36 @@ class PeoplePage(Page):
         self.refresh()
 
     def rebuild_gallery(self) -> None:
-        action = getattr(self.context, "rebuild_gallery", None)
+        action = getattr(self.context, "rebuild_embeddings", None)
+        if action is None:
+            action = getattr(self.context, "rebuild_gallery", None)
         if action is None:
             self._report(False, "Gallery rebuild needs a running app context.")
             return
         try:
-            count = action()
+            result = action()
         except Exception as err:
             self._report(False, "Could not rebuild the gallery: %s" % err)
             return
-        self._report(True, "Gallery rebuilt from %d person(s)." % int(count))
+        if isinstance(result, dict):
+            if result.get("reason"):
+                self._report(False, str(result["reason"]))
+                self.refresh()
+                return
+            self._report(
+                True,
+                "Embedded %d new photo(s), %d already indexed, %d failed. "
+                "Gallery has %d person(s)."
+                % (
+                    int(result.get("embedded", 0)),
+                    int(result.get("already", 0)),
+                    int(result.get("failed", 0)),
+                    int(result.get("people", 0)),
+                ),
+            )
+        else:
+            self._report(True, "Gallery rebuilt from %d person(s)." % int(result))
+        self.refresh()
 
     def _report(self, ok: bool, message: str) -> None:
         self.status_label.setObjectName("Muted" if ok else "Danger")

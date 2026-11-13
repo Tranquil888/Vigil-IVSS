@@ -35,6 +35,24 @@ XVID and mp4v before it skips.
 | `test_display.py` | `LatestFrame` to `QImage`, paint and grab, stale frame, overlay TTL | 9 |
 | `test_display.py` | Static guard that no GUI module imports dlib | 0 |
 
+## Gray-box checks
+
+The queue, thread, database, retention, redaction, backend, and live reload
+checks are in `docs/graybox-test-plan.md`. They use `scripts/graybox_probe.py`
+and the Diagnostics page, and they are the intended follow-up to a green
+automated suite.
+
+Recognition quality is measured separately against a folder-per-person
+dataset:
+
+```powershell
+python scripts\eval_recognition.py --dataset data\dataset --models models `
+    --limit-per-person 8 --require-cnn
+```
+
+The recorded smoke result and the threshold caveat are in
+`docs/graybox-test-plan.md`.
+
 ## The burned-clock measurement
 
 `tests/e2e/clock_video.py` writes a clip with a 32-bit millisecond value on
@@ -121,11 +139,11 @@ date, machine, camera models, and the commands used.
 
 - Build with the conda-forge `dlib-gpu` environment, copy the bundle to the
   RTX 3050 machine, and start it.
-- Pass: the diagnostics/status area reports CUDA and cuDNN as available, the
-  detector reports GPU, and the bundle does not silently fall back to CPU
+- Pass: the Diagnostics page reports CUDA and cuDNN as available, the detector
+  reports `dlib_cnn`, and the bundle does not silently fall back to CPU or HOG
   without a visible warning.
-- Current gap: there is no diagnostics page and the probe does not check
-  cuDNN. See `docs/plan-gap-analysis.md`.
+- The local probe already reports `dlib_cnn`, CUDA, and cuDNN on this machine.
+  The missing evidence is the run of the frozen bundle on the reference GPU.
 
 ## Pass criteria for the MVP
 
@@ -139,16 +157,21 @@ date, machine, camera models, and the commands used.
 
 ## Known blockers
 
-The automated suite does not cover these because they are product gaps, not
-test-harness gaps:
+The automated suite does not cover these because they are product gaps or need
+hardware, not because the harness is missing:
 
-- One stranger event row per visit instead of one per tracklet.
-- Event retention pruning.
-- CUDA absence does not switch to HOG or motion-only automatically.
-- No first-run diagnostics page and no cuDNN check.
-- Camera secrets are stored in plain TOML.
+- Camera secrets are stored in plain TOML. A keyring or encrypted fallback is
+  not implemented. The `cryptography` package is available, but the DPAPI or
+  keyring design is not chosen yet.
 - No installer or portable zip.
-- No clean-VM or reference-GPU run recorded yet.
+- No clean-VM run of the CPU bundle and no run of the CUDA bundle on the
+  reference GPU.
+- No four-camera hardware run, so the 50 ms gate has only been shown with a
+  single synthetic or file-backed camera.
+- The recognition dataset has two people. The default `known_threshold` of
+  0.6 accepts every measured impostor, so production thresholds are not
+  calibrated yet.
 
-Close the first four before claiming the plan's MVP is complete. The full
-list is in `docs/plan-gap-analysis.md`.
+The closed items, one unknown visit per row, retention pruning, CUDA and cuDNN
+fallback, and the Diagnostics page, now have tests or a recorded probe run.
+The full list is in `docs/plan-gap-analysis.md`.

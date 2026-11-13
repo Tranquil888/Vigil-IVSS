@@ -22,13 +22,17 @@ class CameraManager:
     ) -> None:
         self.config = config
         self.bus = bus
+        self._source_factory = source_factory
         self.inference_queue = DropOldestQueue(config.inference.queue_size)
         self._display: Dict[str, LatestFrame] = {}
         self._motion_queues: Dict[str, DropOldestQueue] = {}
         self._motion_active: Dict[str, threading.Event] = {}
         self._supervisors: List[CameraSupervisor] = []
         self._motion_workers: List[MotionWorker] = []
+        self._build()
 
+    def _build(self) -> None:
+        config = self.config
         for camera in config.cameras:
             if not camera.enabled:
                 continue
@@ -46,7 +50,7 @@ class CameraManager:
                         on_result=self._on_motion,
                     )
                 )
-            factory = source_factory or _default_factory(config)
+            factory = self._source_factory or _default_factory(config)
             self._supervisors.append(
                 CameraSupervisor(
                     camera=camera,
@@ -57,7 +61,7 @@ class CameraManager:
                     motion_queue=self._motion_queues[camera.id],
                     inference_queue=self.inference_queue,
                     source_factory=lambda camera=camera, factory=factory: factory(camera),
-                    bus=bus,
+                    bus=self.bus,
                     motion_active=self._motion_active[camera.id],
                 )
             )
@@ -65,6 +69,46 @@ class CameraManager:
     @property
     def camera_ids(self) -> List[str]:
         return list(self._display)
+
+    def runtime_signature(self):
+        """Everything that needs a capture or motion worker rebuild."""
+        cameras = []
+        for camera in self.config.cameras:
+            cameras.append(
+                (
+                    camera.id,
+                    camera.enabled,
+                    camera.source,
+                    camera.analysis_stream,
+                    repr(camera.motion.model_dump(mode="json"))
+                    if camera.motion is not None
+                    else None,
+                    repr([zone.model_dump(mode="json") for zone in camera.zones]),
+                )
+            )
+        return (
+            tuple(cameras),
+            repr(self.config.capture.model_dump(mode="json")),
+            repr(self.config.motion.model_dump(mode="json")),
+        )
+
+    def reconfigure(self, config: VigilConfig) -> None:
+        """Rebuild capture and motion workers in place, keeping the bus."""
+        was_running = any(worker.is_alive() for worker in self._supervisors)
+        was_running = was_running or any(
+            worker.is_alive() for worker in self._motion_workers
+        )
+        self.stop_all()
+        self.config = config
+        self.inference_queue.resize(config.inference.queue_size)
+        self._display.clear()
+        self._motion_queues.clear()
+        self._motion_active.clear()
+        self._supervisors = []
+        self._motion_workers = []
+        self._build()
+        if was_running:
+            self.start_all()
 
     def display_queue(self, camera_id: str) -> LatestFrame:
         return self._display[camera_id]

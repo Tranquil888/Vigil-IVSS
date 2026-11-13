@@ -13,6 +13,7 @@ import argparse
 import bz2
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import urllib.error
@@ -69,6 +70,31 @@ def existing_files(dest: Path) -> List[Path]:
 
 
 def download(url: str, target: Path) -> None:
+    try:
+        _download_urllib(url, target)
+    except Exception:
+        if not _download_curl(url, target):
+            raise
+
+
+def _download_curl(url: str, target: Path) -> bool:
+    """Fallback for Python builds whose TLS stack cannot reach the mirror."""
+    curl = shutil.which("curl")
+    if not curl:
+        return False
+    print("  urllib failed, retrying with %s" % curl)
+    result = subprocess.run(
+        [curl, "-L", "--fail", "--retry", "3", "-o", str(target), url],
+        stdout=subprocess.DEVNULL,
+    )
+    return (
+        result.returncode == 0
+        and target.is_file()
+        and target.stat().st_size > 0
+    )
+
+
+def _download_urllib(url: str, target: Path) -> None:
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(request, timeout=60) as response:
         expected = response.headers.get("Content-Length")
