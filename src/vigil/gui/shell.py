@@ -245,10 +245,21 @@ class MainWindow(QMainWindow):
             self.backend_label.setObjectName("Warning")
         else:
             device = "GPU" if getattr(status, "cuda", False) else "CPU"
-            self.backend_label.setText(
-                "Face backend: %s, %s" % (getattr(status, "detector", "none"), device)
+            text = "Face backend: %s, %s" % (
+                getattr(status, "detector", "none"),
+                device,
             )
-            self.backend_label.setObjectName("Muted")
+            reason = getattr(status, "reason", "") or ""
+            lowered = reason.lower()
+            degraded = any(
+                word in lowered for word in ("missing", "disabled", "not installed")
+            )
+            if degraded:
+                text = "%s. %s" % (text, reason)
+                self.backend_label.setObjectName("Warning")
+            else:
+                self.backend_label.setObjectName("Muted")
+            self.backend_label.setText(text)
         self.backend_label.style().unpolish(self.backend_label)
         self.backend_label.style().polish(self.backend_label)
         try:

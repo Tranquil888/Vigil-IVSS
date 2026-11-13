@@ -1,4 +1,5 @@
 import threading
+from types import SimpleNamespace
 
 from tests.gui.fakes import FakeContext
 from vigil.config.models import CameraConfig, VigilConfig
@@ -78,5 +79,25 @@ def test_notification_from_a_worker_thread_is_queued(qapp, tmp_path):
     qapp.processEvents()
 
     assert "Ann was recognised" in window.statusBar().currentMessage()
+    window._quitting = True
+    window.close()
+
+
+def test_status_bar_warns_when_recognition_is_disabled(qapp, tmp_path):
+    window, context = build_window(tmp_path)
+    context.status = SimpleNamespace(
+        available=True,
+        cuda=False,
+        detector="dlib_cnn",
+        reason=(
+            "recognition is disabled, missing "
+            "shape_predictor_68_face_landmarks.dat"
+        ),
+    )
+
+    window._update_status()
+
+    assert "recognition is disabled" in window.backend_label.text()
+    assert window.backend_label.objectName() == "Warning"
     window._quitting = True
     window.close()

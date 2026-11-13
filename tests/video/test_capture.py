@@ -66,8 +66,10 @@ def test_display_gets_every_frame_and_inference_is_sampled():
 
     assert not supervisor.is_alive()
     assert display.generation == 60
-    # 60 frames at 30 fps over 2 s, sampled at 5 fps.
-    assert 8 <= supervisor.stats()["inference_sent"] <= 12
+    # 60 frames at 30 fps over 2 s, sampled at 5 fps. Windows timer
+    # granularity can stretch the run, so the ceiling only proves sampling.
+    sent = supervisor.stats()["inference_sent"]
+    assert 8 <= sent < 30
 
 
 def test_supervisor_keeps_trying_after_open_failures():

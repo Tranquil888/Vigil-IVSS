@@ -53,6 +53,20 @@ def probe_backend(face: FaceConfig, models_dir: Path) -> BackendStatus:
                 "dlib_hog",
                 "CNN model missing at %s, using HOG" % model,
             )
+
+    missing = [
+        name
+        for name in (SHAPE_MODEL, FACE_MODEL)
+        if not (Path(models_dir) / name).exists()
+    ]
+    if missing:
+        return BackendStatus(
+            True,
+            cuda,
+            face.detector,
+            "recognition is disabled, missing %s" % ", ".join(missing),
+        )
+
     return BackendStatus(
         True,
         cuda,

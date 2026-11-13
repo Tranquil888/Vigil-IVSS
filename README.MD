@@ -1,241 +1,289 @@
-# Vigil (prev. Dozor): Video Surveillance with Face Recognition
+# Vigil
 
-Vigil is a local video surveillance application for real-time monitoring, face recognition, and event review. It captures from cameras and video files, identifies people against a trained dataset, and stores events, photos, and short video clips on the local machine. All data lives in SQLite databases and files under `data/`.
+Vigil watches a few cameras on one machine, recognizes people you have
+enrolled, logs what happened, and keeps the live view responsive while it
+does the recognition. Everything runs locally. There is no account, no
+cloud, and no network call after you download the model files.
 
-The application is built with Python, OpenCV, dlib, and the face_recognition library. The application serves small businesses, residential complexes, and schools that need local recording without a cloud subscription.
+Version 2.0 is a rewrite of the old tkinter and `face_recognition`
+prototype in `legacy/`. The new application is PySide6, dlib, OpenCV, and
+SQLite, packaged as a single process with background workers.
 
-## Table of Contents
-- [Features](#features)
-- [Screenshots](#screenshots)
-- [System requirements](#system-requirements)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Event journal](#event-journal)
-- [Object management](#object-management)
-- [Event video recording](#event-video-recording)
-- [Project structure](#project-structure)
-- [Configuration](#configuration)
-- [License](#license)
+## What 2.0 does
 
-## Features
+- Live view of every enabled camera in a grid or a single-camera view.
+- Motion gating: recognition runs only when a camera sees movement, so an
+  idle camera costs almost nothing.
+- Face detection with dlib CNN (or HOG when the CNN model is missing) and
+  a ResNet embedding model.
+- Tracklet decisions: a person is reported only after several observations
+  agree, not after one lucky frame.
+- Event log with camera, type, person, zone, score, and snapshot.
+- People gallery with photo import, enable/disable, and an embedding
+  rebuild that takes effect without a restart.
+- Grouping of repeated unknown visitors into clusters.
+- Desktop tray notifications for known people and strangers, with a
+  cooldown.
+- TOML configuration through `%APPDATA%\Vigil\config.toml` and the
+  Settings page.
+- A developer JSON log with credentials, embeddings, and image bytes
+  redacted.
 
-### Monitoring and recognition
-Vigil captures from IP cameras, USB webcams, and video files. Face detection uses a dlib CNN or HOG model, and recognized faces appear on the live feed with a name and confidence score. Unknown faces are flagged. Frame processing skips frames on high-resolution sources to keep the interface responsive.
+Recording, NVR playback, remote access, user accounts, Telegram and email
+delivery, WebRTC, cross-camera re-identification, anti-spoofing, and
+encryption at rest are out of scope for 2.0.
 
-### Event management
-Vigil groups recognition events into sessions based on an inactivity delay. The Event Journal lists sessions, filters by date, object name, and object type, and shows the recognized people and captured photos for each session. You can export events to a text file from the Event Journal.
+## The latency promise
 
-### Object management
-Create, edit, and delete object profiles with a name, category, phone number, address, and comments. Upload a custom avatar or use the category default. Add photos to a person's dataset and retrain the recognition model when the dataset changes.
+The display path never waits for inference. Each camera publishes into a
+one-slot last-frame holder. The video tile reads that slot and paints. A
+separate bounded queue feeds sampled copies to a single inference worker,
+and that queue drops its oldest item instead of growing.
 
-Categories are Resident, Staff, Visitor, and Unknown. Each category has a default avatar color: green, grey, blue, and red.
+Measured on this machine at 30 fps with a 15 ms display poll:
 
-### Security and administration
-Two roles control access. Administrators can manage users, cameras, settings, model training, and avatars. Operators can monitor, record, stream, review events, and edit object profiles. Avatar upload and removal require the `can_manage_objects` permission.
+| Inference delay | p50 | p95 | max |
+|---|---|---|---|
+| 0 ms | 16.0 ms | 32.0 ms | 47.0 ms |
+| 150 ms | 16.0 ms | 46.0 ms | 62.0 ms |
 
-Vigil hashes passwords with SHA-256. The application tracks login attempts and locks an account after three failed attempts. The application writes activity to `log.log`.
+The p95 difference is 14 ms. The regression test asserts p95 under 50 ms
+and a difference under 50 ms with a 150 ms inference delay. Run it
+yourself with `python tools\latency_harness.py --seconds 10 --with-inference-delay 150`.
+Details and caveats are in `docs/latency.md`.
 
-### Video and media
-A circular buffer holds the last 10 seconds of video at 10 FPS. When a recognition event starts a session, Vigil saves the buffer as an MP4 clip. The Event Journal includes a video player with play, pause, stop, seek, frame stepping, and playback speed from 0.5x to 3.0x.
+## Requirements
 
-### Architecture
-The application uses a modular package layout with separate modules for capture, processing, recognition, events, database access, and the Tkinter GUI. Video capture and processing run on background threads so the interface stays responsive. Five SQLite databases store settings, users, objects, camera configuration, and events.
+- Windows 11 (the target), and the code should run on Linux, though the build
+  scripts are PowerShell.
+- CPython 3.9 or 3.12. The code supports both; 3.9 is what the bundled
+  verification environment uses.
+- Enough memory for the models you load. CNN face detection is the memory
+  hungry part when several cameras use it.
+- A webcam, an RTSP camera, or a video file. USB cameras appear as source
+  `"0"`, `"1"`, and so on.
+- Optional: an NVIDIA GPU and a dlib build compiled with CUDA.
 
-## Screenshots
+## Install
 
-![Main window with live feed and recognized objects](docs/images/main-camera.png)
+The quick path on Windows:
 
-![Event journal with sessions, recognized people, and photos](docs/images/event-journal.png)
-
-![Objects tab with recognized people and categories](docs/images/objects-tab.png)
-
-## System requirements
-
-### Minimum
-- Windows 10/11 or Linux (Ubuntu 18.04+)
-- Python 3.8 or higher
-- 4 GB RAM (8 GB recommended)
-- 10 GB free disk space for the application, databases, and media
-- A webcam, IP camera, or video file
-
-### Recommended
-- Multi-core CPU
-- NVIDIA GPU with CUDA for faster CNN face detection (dlib must be built with CUDA)
-- 8 GB or more RAM
-- SSD storage for databases and video
-
-### Dependencies
-Dependencies are listed in `requirements.txt`.
-
-```bash
-pip install -r requirements.txt
+```powershell
+.\scripts\setup_env.ps1
 ```
 
-For CUDA-accelerated face recognition, create a conda environment and install dlib with CUDA support:
+The script creates `.venv`, installs the project with development extras,
+and downloads the model files to `%LOCALAPPDATA%\Vigil\models`. Skip the
+download with `-SkipModels` if you manage models yourself.
 
-```bash
-conda create -n dlib-cuda python=3.8
-conda activate dlib-cuda
-pip install -r requirements.txt
+Manual path:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.\.venv\Scripts\python.exe scripts\fetch_models.py --dest "$env:LOCALAPPDATA\Vigil\models"
 ```
 
-## Installation
+`dlib` is not a pip dependency because wheel availability varies. Install
+it in the same environment:
 
-1. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd dozor-clone
-   ```
-
-2. Create an environment:
-   ```bash
-   conda create -n dlib-cuda python=3.8
-   conda activate dlib-cuda
-   ```
-   Or use a virtual environment:
-   ```bash
-   python -m venv vigil-env
-   source vigil-env/bin/activate  # Linux/macOS
-   vigil-env\Scripts\activate     # Windows
-   ```
-
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. Create the first administrator:
-   ```bash
-   python setup_admin.py
-   ```
-
-5. Start the application:
-   ```bash
-   python main_new.py
-   ```
-
-### First run
-1. Launch `python main_new.py`.
-2. Log in with the administrator account created by `setup_admin.py`.
-3. Open Camera and Recognition Settings to choose a camera or video file.
-4. Add object profiles and upload dataset photos.
-5. Train the recognition model from Object Management.
-
-## Usage
-
-### Basic workflow
-1. Log in with an administrator or operator account.
-2. Configure a camera source in Camera and Recognition Settings.
-3. Add the people you want to recognize.
-4. Start the camera from the Camera tab or the toolbar.
-5. Review recognition activity in the Event Journal.
-
-### Key operations
-- Objects, Add Object creates a profile.
-- Objects, Train Model retrains the recognition model.
-- Events, View Events opens the Event Journal.
-- Camera, Camera Settings configures the video source.
-- Users, User List manages accounts (administrators only).
-
-### Performance tips
-- Use a CUDA build of dlib for CNN face detection.
-- Lower the recognition confidence threshold if faces are missed, or raise it to reduce false matches.
-- Adjust the inactivity delay to control how events are grouped.
-- Retrain the model after adding dataset photos.
-
-## Event journal
-
-The Event Journal lists recognition sessions and their details.
-
-### Session management
-Vigil groups events into sessions based on the inactivity delay. The default delay is 10 seconds; an administrator can change it. Each session gets an automatic description such as `event00017-3-objects`.
-
-### Filtering
-Filter by date range, object name (partial match), or object type (Resident, Staff, Visitor, Unknown). You can combine filters.
-
-### Photos
-Vigil captures photos of recognized people automatically and stores them under `data/captured_faces/{object_name}/{timestamp}_{object_name}.jpg`. Vigil does not save photos of unknown faces. The gallery reflows between 2 and 8 columns depending on the window width, with a 140 px minimum per photo. Vigil renders thumbnails at 120x120 px.
-
-### Video
-Sessions with a recorded clip show an Open Video button. The player supports play, pause, stop, seek, frame stepping, and speeds from 0.5x to 3.0x.
-
-### Access
-Administrators can change the inactivity delay. Operators can view events, photos, and videos.
-
-### Database tables
-- `event_sessions` holds session metadata (ID, start and end times, duration, description).
-- `event_objects` holds recognized objects with confidence scores.
-- `event_photos` holds photo records with file paths and timestamps.
-- `event_videos` holds video metadata with file information and duration.
-
-## Object management
-
-### Profiles
-Create, read, update, and delete object profiles. Each profile stores a first and last name, category, phone number, address, comments, avatar, and recognition encodings.
-
-### Avatars
-Upload a JPG, JPEG, PNG, BMP, or GIF image up to 5 MB. Vigil resizes images with PIL LANCZOS and saves them as JPEG at quality 85. Vigil names uploaded avatars with a UUID and stores them in `data/photo/objects/`. Default avatar colors are green for Resident, grey for Staff, blue for Visitor, and red for Unknown.
-
-### Datasets
-The application stores dataset photos in `data/dataset/{object_name}/`. Add or remove photos for a person, then retrain the model. Only administrators can train the model.
-
-### Operator access
-Operators can view profiles and edit object details. Avatar upload and removal require administrator permissions.
-
-## Event video recording
-
-### Buffer
-A circular buffer holds the last 10 seconds of video at 10 FPS. When a recognition event starts a session, Vigil writes the buffer to `data/event_videos/event_{session_id}_{timestamp}.mp4` using the MP4V codec. The `event_videos` table stores video metadata.
-
-### Playback
-Open an event in the Event Journal and choose Open Video. The player supports play, pause, stop, seek, frame stepping, and speeds from 0.5x to 3.0x.
-
-### Cleanup
-Deleting an event removes its associated photos, objects, and video records from the database.
-
-## Project structure
-
-```
-vigil/
-├── core/                       # Application controller and exceptions
-├── config/                     # Constants and settings management
-├── database/                   # SQLite managers for all databases
-├── auth/                       # Authentication and role-based authorization
-├── gui/
-│   ├── main_window.py          # Main Tkinter window
-│   └── dialogs/                # Login, event journal, object, video, and training dialogs
-├── video/                      # Capture, frame processing, and the event buffer
-├── recognition/                # Face detection, training, and the training service
-├── events/                     # Event logger and session manager
-├── services/                   # Object service
-├── models/                     # Object data model
-└── utils/                      # Dataset manager and logging
+```powershell
+.\.venv\Scripts\python.exe -m pip install dlib
 ```
 
-Entry points:
-- `main_new.py` is the modular application.
-- `setup_admin.py` creates the first administrator.
-- `transliterate.py` is a Russian to English transliteration helper.
+For CUDA, use a conda environment where dlib is built with CUDA enabled, then
+install the project into that environment. Vigil reports `cuda` in the
+backend status only when dlib was built with CUDA and `dlib.cuda.get_num_devices()`
+returns at least one device.
 
-### Databases
-- `data/setting.db` stores application settings.
-- `data/authentication.db` stores users and roles.
-- `data/objects.db` stores object profiles and recognition data.
-- `data/camerasetting.db` stores camera configuration.
-- `data/events.db` stores events, sessions, photos, and videos.
+Start the application:
 
-### Media storage
-- `data/captured_faces/` holds event photos organized by object.
-- `data/event_videos/` holds event video clips.
-- `data/photo/objects/` holds object avatars.
-- `data/dataset/` holds training datasets organized by object.
+```powershell
+.\.venv\Scripts\python.exe -m vigil.app
+```
+
+The installed console script `vigil` runs the same entry point.
+
+## First run
+
+1. Start Vigil. With no config file it uses the shipped defaults and shows
+   an empty camera list.
+2. Check the status bar at the bottom of the window. It reports the face
+   backend and whether it runs on CPU or GPU. If the models are missing, the
+   status says so and recognition is disabled; motion events still work.
+3. Open Cameras and add your first camera.
+4. Open People and add someone, then import one or more photos of them.
+5. Watch the Live page. A recognized face appears with a name; a stranger
+   appears as `Unknown`.
+6. Review the Events page.
+
+Configuration and data live outside the repository:
+
+| Path | Contents |
+|---|---|
+| `%APPDATA%\Vigil\config.toml` | configuration written by the Settings page |
+| `%LOCALAPPDATA%\Vigil\vigil.db` | SQLite database (events, people, embeddings, clusters) |
+| `%LOCALAPPDATA%\Vigil\logs\` | rotating developer log |
+| `%LOCALAPPDATA%\Vigil\snapshots\` | event snapshots |
+| `%LOCALAPPDATA%\Vigil\people\` | imported person photos |
+| `%LOCALAPPDATA%\Vigil\models\` | the three dlib model files |
+
+Set `VIGIL_CONFIG` to use a different config file and `VIGIL_DATA_DIR` to
+move the data directory. `storage.data_dir` in the config does the same for
+data.
+
+## Cameras
+
+The Cameras page edits `[[cameras]]` entries. A camera needs an id (lowercase
+letters, digits, `_`, `-`), a display name, and a source:
+
+- `"0"` for the first local camera.
+- `"rtsp://user:password@192.168.1.10:554/stream2"` for RTSP.
+- A file path for a recorded clip.
+
+Camera, motion, zone, and inference changes apply after a restart. Adding a
+person, importing a photo, or disabling a person takes effect immediately.
+
+Each camera can override the global motion section with `[cameras.motion]`
+and define polygon zones:
+
+```toml
+[[cameras.zones]]
+name = "walkway"
+points = [[0.30, 0.35], [0.80, 0.35], [0.85, 0.90], [0.25, 0.90]]
+threshold_pct = 2.0
+exclude = false
+```
+
+Points are normalized to `0..1` so the zone survives a resolution change.
+An `exclude = true` zone subtracts a region, for example a timestamp overlay
+or a tree that moves in the wind.
+
+Recognition is gated by motion by default. If a camera has no usable motion
+signal, set `motion.enabled = false` for that camera and rely on the
+analysis frame rate.
+
+## People and recognition
+
+Open People, add a person, and import photos. Each photo is detected and
+embedded immediately. The gallery is rebuilt from enabled people only, so
+disabling a person removes them from matching without deleting their data.
+
+The defaults are a starting point, not a guarantee:
+
+- `known_threshold = 0.6`: maximum distance for a known match.
+- `unknown_threshold = 0.7`: minimum distance for a stranger. Distances
+  between the two thresholds land in the uncertain band.
+- `margin = 0.05`: the best person must beat the runner-up by this much.
+- `min_votes = 2`: at least this many observations must agree before a
+  tracklet is reported as a known person.
+- `best_k = 5`: the number of highest-quality observations kept per
+  tracklet.
+
+Read `docs/calibration.md` before trusting these numbers with your camera,
+lighting, and photo set.
+
+## Models
+
+The three files and their roles are described in `docs/models.md`. Fetch
+them once:
+
+```powershell
+python scripts\fetch_models.py --dest "$env:LOCALAPPDATA\Vigil\models"
+```
+
+The script checks decompressed sizes and refuses to overwrite existing files
+without `--force`. Vigil never downloads models at run time. If a file is
+missing, the backend degrades in a visible way instead of failing at the
+first frame.
 
 ## Configuration
 
-The application stores settings in `data/setting.db`, and you edit them through the Camera and Recognition Settings dialog. Key options include the recognition confidence threshold (45% in the bundled database), the inactivity delay (10 seconds), the recognition frame skip, the recognition cooldown, camera resolution and quality, and video playback speed and loop behavior.
+The Settings page covers every field that has a GUI control and writes the
+TOML file back without dropping comments outside camera arrays. Advanced
+fields are hidden behind the Advanced checkbox.
 
-The application defines database paths in `vigil/config/constants.py`. It configures logging in `vigil/utils/logging_config.py`, which writes to `log.log`.
+`config.example.toml` documents the shipped defaults. The important sections:
+
+- `[inference]`: device selection, analysis fps, queue size, maximum frame
+  age.
+- `[face]`: detector, thresholds, vote rules, tracking, unknown grouping.
+- `[motion]`: MOG2 settings, sampling stride, zone thresholds, cooldown.
+- `[display]`: grid and single-view refresh rates, overlay lifetime.
+- `[notify]`: desktop toasts and stranger cooldown.
+- `[capture]`: open timeout, stall timeout, exponential backoff.
+- `[storage]`: data directory, retention, snapshot quality.
+
+## Build a bundle
+
+```powershell
+.\scripts\build_cpu.ps1
+.\scripts\build_cuda.ps1
+```
+
+Both produce `dist\Vigil\Vigil.exe` as a one-directory bundle. The CUDA
+script additionally copies CUDA runtime DLLs when it finds them and warns
+when one is missing. Models are not bundled. See `docs/packaging.md` for the
+build result on this machine and the Qt/ICU note.
+
+## Development
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
+The suite covers config, queues, storage, capture backoff, motion zones,
+tracking, decisions, unknown grouping, the pipeline, the notifier, the GUI
+pages, and the display latency invariant. GUI tests run with
+`QT_QPA_PLATFORM=offscreen`.
+
+Source layout:
+
+```
+src/vigil/
+  analysis/   backend, quality gate, tracker, gallery, decisions, pipeline
+  config/     Pydantic models, TOML load and save
+  core/       queues, records, event bus, composition root
+  gui/        PySide6 shell, pages, widgets, theme, tray
+  notify/     desktop notifier thread
+  storage/    schema, writer, reader, embeddings, people, snapshots
+  telemetry/  redaction, rotating JSON log
+  video/      sources, capture supervisor, camera manager
+tools/        latency harness
+scripts/      environment, model fetch, build
+packaging/    PyInstaller spec and entry point
+legacy/       the old tkinter application, kept for reference
+```
+
+`docs/architecture.md` explains the thread model and the queues.
+`docs/calibration.md` explains threshold selection.
+`docs/models.md` explains the three model files.
+`docs/latency.md` explains the display measurement.
+
+## Troubleshooting
+
+**The backend says recognition is disabled.** The shape predictor and ResNet
+files are missing. Run the fetch script and check `face.models_dir`.
+Detection can still work through HOG, but there is nothing to match against.
+
+**Qt fails with `0xc0000139` at startup in a conda environment.** A conda
+`icuuc.dll` is shadowing a Qt build that needs its own ICU. Install
+PySide6-Essentials 6.9.3 in that environment or use a venv without conda
+DLLs on the search path. The frozen bundle filters unversioned conda ICU
+DLLs for the same reason.
+
+**A camera never connects.** The supervisor retries with exponential backoff
+and publishes an offline event after `capture.offline_notify_after_s`. Check
+the source string, the password in the URL, and whether another process holds
+the camera.
+
+**The live view stutters but events keep arriving.** Check `display.grid_fps`
+and the number of visible tiles. A hidden grid page skips its tile timers.
+The inference worker is not in the display path, so model speed is not the
+cause.
 
 ## License
 
-MIT License. The repository does not currently include a LICENSE file.
+MIT. The repository does not include a LICENSE file yet. The dlib model
+files are downloaded from dlib.net and are not redistributed here; check
+dlib.net for the terms that apply to each file.
