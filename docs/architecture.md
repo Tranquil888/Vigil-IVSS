@@ -50,7 +50,9 @@ item when full, so a slow consumer increases the drop counter, not latency.
 
 The display tile polls at `display.grid_fps` or `display.single_fps` and
 calls `latest()` on its timer. It does not consume a queue and cannot
-back up. `tests/test_latency_invariant.py` guards this with a p95 budget.
+back up. `tests/test_latency_invariant.py` guards this with a p95 budget, and
+`tests/e2e/test_latency.py` repeats the check with a burned-clock video, a
+real capture thread, and a 150 ms inference delay.
 
 ## Clocks
 

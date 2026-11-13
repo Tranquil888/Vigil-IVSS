@@ -48,9 +48,11 @@ Measured on this machine at 30 fps with a 15 ms display poll:
 | 150 ms | 16.0 ms | 46.0 ms | 62.0 ms |
 
 The p95 difference is 14 ms. The regression test asserts p95 under 50 ms
-and a difference under 50 ms with a 150 ms inference delay. Run it
-yourself with `python tools\latency_harness.py --seconds 10 --with-inference-delay 150`.
-Details and caveats are in `docs/latency.md`.
+and a difference under 50 ms with a 150 ms inference delay. A second,
+burned-clock end-to-end test plays a real clip through the capture thread and
+includes video decode; its p95 difference is 1.0 ms. Run the synthetic
+harness with `python tools\latency_harness.py --seconds 10 --with-inference-delay 150`.
+Details and caveats are in `docs/latency.md` and `docs/e2e-test-plan.md`.
 
 ## Requirements
 
@@ -237,6 +239,17 @@ tracking, decisions, unknown grouping, the pipeline, the notifier, the GUI
 pages, and the display latency invariant. GUI tests run with
 `QT_QPA_PLATFORM=offscreen`.
 
+End-to-end tests live in `tests/e2e`. They use a synthetic burned-clock video,
+real threads, and a real SQLite file, and need no camera or GPU:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests\e2e -q -m e2e
+```
+
+The automated coverage, the manual hardware matrix, and the current blockers
+are in `docs/e2e-test-plan.md`. The comparison against the build plan is in
+`docs/plan-gap-analysis.md`.
+
 Source layout:
 
 ```
@@ -259,6 +272,8 @@ legacy/       the old tkinter application, kept for reference
 `docs/calibration.md` explains threshold selection.
 `docs/models.md` explains the three model files.
 `docs/latency.md` explains the display measurement.
+`docs/e2e-test-plan.md` explains the end-to-end suite and the manual gates.
+`docs/plan-gap-analysis.md` lists what the build plan still needs.
 
 ## Troubleshooting
 

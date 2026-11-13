@@ -54,6 +54,7 @@ markers = [
     "gpu: requires a working CUDA dlib build",
     "models: requires downloaded dlib model files",
     "gui: requires a Qt platform plugin",
+    "e2e: end-to-end tests with real threads and a synthetic video",
 ]
 
 [tool.coverage.run]

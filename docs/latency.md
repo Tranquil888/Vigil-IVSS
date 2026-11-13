@@ -56,10 +56,32 @@ is the Windows timer granularity on this machine; the 62 ms maximum is one
 late scheduler tick, not a queue buildup. The simulated run has no timer and
 shows the structural ceiling: one poll interval plus one frame interval.
 
-The harness uses a synthetic producer rather than a video file. A file adds
+This harness uses a synthetic producer rather than a video file. A file adds
 decode jitter that has nothing to do with the invariant under test, and the
 display consumer cannot tell a decoded frame from a synthetic one. Decode
 cost belongs to the capture benchmark, not this one.
+
+## Glass-to-glass check
+
+`tests/e2e/test_latency.py` closes the gap that the synthetic harness leaves.
+It writes a 640x360 clip with a 32-bit millisecond clock on every frame,
+plays it at 30 fps through the real capture supervisor, decodes the clock
+from the frame the display consumer reads, and compares it with the source's
+presentation base. The number includes MJPG decode and the 15 ms display
+poll.
+
+Measured on the same machine, 2 s per run:
+
+| Run | Samples | p50 | p95 | p99 | Inference drops |
+|---|---|---|---|---|---|
+| No delay | 122 | 32.0 ms | 48.0 ms | 50.0 ms | 0 |
+| 150 ms delay | 122 | 33.5 ms | 49.0 ms | 50.0 ms | 16 |
+
+The p95 delta is 1.0 ms. The absolute values are higher than the synthetic
+numbers because decode is included. Use the synthetic harness for structural
+regressions and the burned-clock test for the end-to-end claim. The manual
+matrix for four 1080p cameras on the reference GPU is in
+`docs/e2e-test-plan.md`.
 
 ## Regression tests
 

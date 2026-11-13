@@ -1,4 +1,4 @@
-# SDD ledger — plan: docs/superpowers/plans/2026-11-11-vigil-mvp.md
+# SDD ledger - plan: docs/superpowers/plans/2026-11-11-vigil-mvp.md
 
 Spec: docs/superpowers/specs/2026-11-11-vigil-mvp-design.md
 Branch: feat/3-rewrite-vigil (in-place rewrite, chosen by user)
@@ -36,4 +36,9 @@ Runtime for verification: conda env dlib-cuda via dlib-env\Scripts\python.exe (C
   - Ruling: the spec drops every ICU DLL sourced from the conda prefix, not only unversioned names. A clean build now contains no ICU DLL and starts offscreen without `0xc0000139`. Qt's own versioned ICU files, when a newer PySide6 ships them, are untouched.
   - Ruling: the capture sampling test now uses `8 <= sent < 30` instead of `8 <= sent <= 12`. Windows timer granularity can stretch 60 frames at 30 fps enough to send 13 samples; the stricter claim was about wall-clock pacing, not about the sampler.
   - Build result: PyInstaller 6.22.3, CPython 3.9.23, PySide6 6.9.3, 68 seconds clean, 927 MB bundle. `Vigil.exe` stayed alive for eight seconds offscreen with only the expected missing-model warnings in the log. The bundle pulls CUDA 11 `cublas`/`cublasLt` through dlib, so most of its size is not application code.
+- Audit and E2E preparation: complete. `docs/plan-gap-analysis.md` checks the tree against `Vigil_new_plan.md` section by section, and `docs/e2e-test-plan.md` defines the automated suite plus the manual hardware matrix.
+  - Added `tests/e2e`: burned-clock codec, paced video source, glass-to-glass latency under a 150 ms inference delay, motion and stranger rows through the real database, camera offline and online events, unavailable-backend fallback, restart persistence, offscreen video paint, overlay TTL, and a static guard that no GUI module imports dlib.
+  - Ruling: the synthetic harness and the burned-clock harness coexist. The synthetic run isolates queue structure; the burned-clock run includes MJPG decode and a real capture thread. Recorded values are p95 48 ms with no delay and 49 ms with a 150 ms delay, a 1.0 ms delta, with 16 inference drops. Both are in `docs/latency.md`.
+  - Ruling: E2E tests carry the `e2e` marker so `pytest -m e2e` runs only the real-thread paths. The full suite is 166 passed on CPython 3.9.23.
+  - Open gaps are listed as MVP blockers in `docs/plan-gap-analysis.md`: one event per unknown visit, event retention pruning, automatic CUDA fallback and cuDNN probe, diagnostics page, keyring secrets, clean-VM and reference-GPU builds, installer, and the four-camera hardware run.
 
