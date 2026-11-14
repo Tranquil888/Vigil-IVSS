@@ -31,6 +31,41 @@ def install_exception_hook(logger: logging.Logger) -> None:
     sys.excepthook = hook
 
 
+def has_console() -> bool:
+    """True when the process owns a console window, as in a terminal launch.
+
+    Autostart entries and shortcuts usually run without a console. A terminal
+    launch is an explicit request to see the app, so it should not be silent.
+    """
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            get_console_window = ctypes.windll.kernel32.GetConsoleWindow
+            get_console_window.restype = ctypes.c_void_p
+            return bool(get_console_window())
+        except Exception:
+            return False
+    try:
+        return bool(sys.stdout is not None and sys.stdout.isatty())
+    except Exception:
+        return False
+
+
+def should_show_window(
+    start_minimized: bool, console_attached: bool, tray_available: bool
+) -> bool:
+    """Decide whether the main window opens at startup.
+
+    ``start_minimized`` only has a safe meaning when there is a tray icon to
+    restore the window from, and an explicit console launch always wins. A
+    hidden window with no way back looks exactly like a failed launch.
+    """
+    if not start_minimized:
+        return True
+    return bool(console_attached or not tray_available)
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     multiprocessing.freeze_support()
 
@@ -53,9 +88,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     context = AppContext(config)
     window = MainWindow(context, config)
-    if not config.app.start_minimized:
+    console = has_console()
+    if should_show_window(
+        config.app.start_minimized, console, window.tray.available
+    ):
+        if config.app.start_minimized:
+            logger.info(
+                "start_minimized ignored (console=%s, tray=%s)"
+                % (console, window.tray.available),
+                extra={"event": "app.start_minimized_ignored"},
+            )
         window.show()
         application.processEvents()
+    else:
+        logger.info(
+            "starting minimized to the tray",
+            extra={"event": "app.start_minimized"},
+        )
     context.start()
 
     try:

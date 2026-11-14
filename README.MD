@@ -141,6 +141,11 @@ Set `VIGIL_CONFIG` to use a different config file and `VIGIL_DATA_DIR` to
 move the data directory. `storage.data_dir` in the config does the same for
 data.
 
+`app.start_minimized = true` keeps the window in the tray for background
+launches such as autostart. A terminal launch always opens the main window,
+and the window opens when no tray icon is available, so the app cannot start
+hidden with no way back.
+
 ## Cameras
 
 The Cameras page edits `[[cameras]]` entries. A camera needs an id (lowercase
