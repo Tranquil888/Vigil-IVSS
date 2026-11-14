@@ -30,8 +30,8 @@ class InferenceConfig(Section):
 
 class FaceConfig(Section):
     detector: Literal["dlib_cnn", "dlib_hog", "none"] = "dlib_cnn"
-    known_threshold: float = Field(default=0.6, gt=0, le=2)
-    unknown_threshold: float = Field(default=0.7, gt=0, le=2)
+    known_threshold: float = Field(default=0.28, gt=0, le=2)
+    unknown_threshold: float = Field(default=0.38, gt=0, le=2)
     margin: float = Field(default=0.05, ge=0, le=1)
     min_votes: int = Field(default=2, ge=1, le=50)
     min_face_px: int = Field(default=48, ge=8, le=2048)

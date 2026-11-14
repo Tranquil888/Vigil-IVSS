@@ -29,7 +29,7 @@ class PeoplePage(Page):
         super().__init__(
             "People",
             "No people yet",
-            "Add a person, then import a clear photo of their face.",
+            "Add a person, then import one or more clear photos of their face.",
             "Add person",
             parent,
         )
@@ -79,14 +79,10 @@ class PeoplePage(Page):
         self.photos_label.setObjectName("Muted")
         editor_layout.addWidget(self.photos_label)
 
-        self.status_label = QLabel("")
-        self.status_label.setObjectName("Muted")
-        self.status_label.setWordWrap(True)
-        editor_layout.addWidget(self.status_label)
         editor_layout.addStretch(1)
 
         buttons = QHBoxLayout()
-        self.import_button = QPushButton("Import photo")
+        self.import_button = QPushButton("Import photos")
         self.import_button.clicked.connect(self.import_photo)
         self.rebuild_button = QPushButton("Rebuild embeddings")
         self.rebuild_button.clicked.connect(self.rebuild_gallery)
@@ -169,7 +165,6 @@ class PeoplePage(Page):
         self.photos_label.setText(
             "No photos yet" if count == 0 else "%d photo(s) on file" % count
         )
-        self.status_label.setText("")
 
     def add_person(self) -> None:
         if self.store is None:
@@ -254,23 +249,52 @@ class PeoplePage(Page):
 
     def import_photo(self) -> None:
         if self._selected_id is None:
+            self._report(False, "Select a person before importing a photo.")
             return
-        path, _filter = QFileDialog.getOpenFileName(
-            self, "Import a face photo", "", "Images (*.jpg *.jpeg *.png)"
+        paths, _filter = QFileDialog.getOpenFileNames(
+            self,
+            "Import face photos",
+            "",
+            "Images (*.jpg *.jpeg *.png *.bmp *.webp)",
         )
-        if not path:
+        if not paths:
+            self._report(True, "No photos selected.")
             return
         action = getattr(self.context, "add_person_photo", None)
         if action is None:
             self._report(False, "Photo import needs a running app context.")
             return
-        try:
-            ok, message = action(self._selected_id, Path(path))
-        except Exception as err:
-            self._report(False, "Could not import the photo: %s" % err)
-            return
-        self._report(ok, message)
+        imported = 0
+        skipped = 0
+        problems = []
+        for path in paths:
+            name = Path(path).name
+            try:
+                ok, message = action(self._selected_id, Path(path))
+            except Exception as err:
+                problems.append("%s: %s" % (name, err))
+                continue
+            if not ok:
+                problems.append("%s: %s" % (name, message))
+            elif "already" in message.lower():
+                skipped += 1
+            else:
+                imported += 1
         self.refresh()
+        if not problems:
+            message = "Imported %d photo(s)." % imported
+            if skipped:
+                message += " %d already on file." % skipped
+            self._report(True, message)
+            return
+        if imported or skipped:
+            self._report(
+                False,
+                "Imported %d photo(s), %d already on file. %d failed. %s"
+                % (imported, skipped, len(problems), problems[0]),
+            )
+            return
+        self._report(False, "No photos imported. %s" % problems[0])
 
     def rebuild_gallery(self) -> None:
         action = getattr(self.context, "rebuild_embeddings", None)
@@ -305,10 +329,7 @@ class PeoplePage(Page):
         self.refresh()
 
     def _report(self, ok: bool, message: str) -> None:
-        self.status_label.setObjectName("Muted" if ok else "Danger")
-        self.status_label.style().unpolish(self.status_label)
-        self.status_label.style().polish(self.status_label)
-        self.status_label.setText(message)
+        self.report_action(message, "info" if ok else "error")
 
     def _select(self, person_id: int) -> None:
         for index in range(self.list_widget.count()):

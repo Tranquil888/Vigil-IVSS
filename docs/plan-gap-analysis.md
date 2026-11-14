@@ -87,14 +87,15 @@ display path imports no dlib code. Guarded by
 | Unknown grouping by window and centroid | Done | Merging works, one event row per visit, and cluster ids are seeded from the database at startup |
 | No fine-tuning | Done | Embeddings only |
 
-Threshold defaults match the plan, the uncertain band is validated, and
-`docs/calibration.md` documents the calibration procedure. Per-model threshold
-storage is missing: there is no model or calibration table. A smoke evaluation
-on the local dataset produced top-1 4/5 with genuine distances around 0.20 and
-impostor distances around 0.47, so the default `known_threshold = 0.6` accepts
-every measured impostor. The dataset has two people, so this is a warning to
-calibrate, not a replacement for calibration. Numbers and the command are in
-`docs/graybox-test-plan.md`.
+The shipped thresholds are calibrated from leave-one-out runs, not copied
+from a default: `known_threshold = 0.28` and `unknown_threshold = 0.38`. On
+the 25-person ChokePoint set top-1 was 98.2% with the known threshold at the
+Youden point (genuine 87.5%, impostor 3.3%), and the 25-person holding-out
+condition reached 100% top-1 with 92.1% genuine and 9.2% impostor acceptance.
+The local two-person photo set showed perfect separation. `docs/calibration.md`
+has the tables, the commands, and the gallery-size caveat. Per-model threshold
+storage is still missing: there is no model or calibration table, so a config
+value is global.
 
 ## 6. Motion
 
@@ -191,11 +192,8 @@ These are the gaps that still stop the plan's definition of done:
    RTX 3050.
 3. Installer and portable zip.
 4. Reference-hardware latency run with four 1080p cameras.
-5. Recognition thresholds are not calibrated for production. The current
-   dataset has two people, and `known_threshold = 0.6` accepts every measured
-   impostor.
 
 The closed blockers, one event per unknown visit, retention pruning, automatic
-CUDA and cuDNN fallback, and the Diagnostics page, have tests or a recorded
-probe run. The gray-box checks and the measured recognition numbers are in
-`docs/graybox-test-plan.md`.
+CUDA and cuDNN fallback, the Diagnostics page, and recognition threshold
+calibration have tests or recorded probe runs. The gray-box checks and the
+measured recognition numbers are in `docs/graybox-test-plan.md`.

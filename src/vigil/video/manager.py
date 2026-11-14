@@ -2,15 +2,24 @@
 
 from __future__ import annotations
 
+import logging
 import threading
+from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
 from ..config.models import CameraConfig, VigilConfig
 from ..core.queues import DropOldestQueue, LatestFrame
 from ..core.records import EventRecord, EventType
 from .capture import CameraSupervisor
-from .source import FrameSource, OpenCVSource
+from .source import (
+    VIDEO_SUFFIXES,
+    FrameSource,
+    OpenCVSource,
+    VideoFileSource,
+)
 from ..analysis.motion import MotionWorker
+
+log = logging.getLogger(__name__)
 
 
 class CameraManager:
@@ -29,6 +38,11 @@ class CameraManager:
         self._motion_active: Dict[str, threading.Event] = {}
         self._supervisors: List[CameraSupervisor] = []
         self._motion_workers: List[MotionWorker] = []
+        # Threads cannot be restarted, so the manager remembers whether the
+        # current worker set was ever started. Liveness alone is not enough: a
+        # worker that failed to start, or one whose thread already died, is not
+        # alive but still needs a start call after a rebuild.
+        self._running = False
         self._build()
 
     def _build(self) -> None:
@@ -94,10 +108,7 @@ class CameraManager:
 
     def reconfigure(self, config: VigilConfig) -> None:
         """Rebuild capture and motion workers in place, keeping the bus."""
-        was_running = any(worker.is_alive() for worker in self._supervisors)
-        was_running = was_running or any(
-            worker.is_alive() for worker in self._motion_workers
-        )
+        was_running = self._running
         self.stop_all()
         self.config = config
         self.inference_queue.resize(config.inference.queue_size)
@@ -138,17 +149,37 @@ class CameraManager:
             )
 
     def start_all(self) -> None:
-        for worker in self._motion_workers:
+        """Start every built worker. One failure never blocks the others."""
+        self._running = True
+        for worker in list(self._motion_workers):
+            self._start_worker(worker)
+        for supervisor in list(self._supervisors):
+            self._start_worker(supervisor)
+
+    def _start_worker(self, worker) -> None:
+        if worker.is_alive():
+            return
+        if worker.ident is not None:
+            log.warning(
+                "worker already ran and is no longer alive, rebuild required",
+                extra={"event": "manager.restart_rejected", "detail": worker.name},
+            )
+            return
+        try:
             worker.start()
-        for supervisor in self._supervisors:
-            supervisor.start()
+        except Exception:
+            log.exception(
+                "worker failed to start",
+                extra={"event": "manager.start_failed", "detail": worker.name},
+            )
 
     def start_camera(self, camera_id: str) -> None:
         for supervisor in self._supervisors:
-            if supervisor.camera.id == camera_id and not supervisor.is_alive():
-                supervisor.start()
+            if supervisor.camera.id == camera_id:
+                self._start_worker(supervisor)
 
     def stop_all(self, timeout: float = 5.0) -> None:
+        self._running = False
         for supervisor in self._supervisors:
             supervisor.stop(timeout=timeout / max(1, len(self._supervisors)))
         for worker in self._motion_workers:
@@ -164,8 +195,19 @@ class CameraManager:
         return None
 
 
+def _source_lines(camera: CameraConfig) -> List[str]:
+    return [line.strip() for line in str(camera.source).splitlines() if line.strip()]
+
+
+def _is_video_path(text: str) -> bool:
+    return Path(text).suffix.lower() in VIDEO_SUFFIXES
+
+
 def _default_factory(config: VigilConfig):
     def build(camera: CameraConfig) -> FrameSource:
+        lines = _source_lines(camera)
+        if len(lines) > 1 or (lines and _is_video_path(lines[0])):
+            return VideoFileSource(lines)
         return OpenCVSource(
             camera.source,
             open_timeout_ms=config.capture.open_timeout_ms,

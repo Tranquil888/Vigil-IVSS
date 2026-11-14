@@ -191,11 +191,13 @@ The automated guards are `tests/test_app_context.py`,
 ## 8. Recognition dataset evaluation
 
 The dataset is one subfolder per person. The script embeds up to
-`--limit-per-person` images per person and scores leave-one-out.
+`--limit-per-person` images per person and scores leave-one-out. It reports the
+top-1 result, both distance distributions, the equal error point, the Youden
+point, and suggested thresholds.
 
 ```powershell
 & $py scripts\eval_recognition.py --dataset data\dataset --models models `
-    --limit-per-person 8 --require-cnn --json
+    --limit-per-person 12 --gallery-score min --require-cnn --json
 ```
 
 Pass criteria:
@@ -207,23 +209,61 @@ Pass criteria:
   distributions, with a margin. A threshold that accepts every measured
   impostor is a calibration failure, even when accuracy looks good.
 
-Recorded on 2026-11-13 with 2 people and 8 images:
+Recorded on 2026-11-14 with ChokePoint portal 1 (`test-dataset\P1E.tar`),
+25 people, 12 crops per person across 12 camera sequences:
 
 | Measure | Value |
 |---|---|
-| Embeddings | 5 of 8 images, 3 skipped with no face |
-| Top-1 | 4/5, 80.0% |
-| Genuine distance | mean 0.196, p90 0.258 |
-| Impostor distance | mean 0.470, min 0.454 |
-| `known_threshold = 0.6` | accepts 4/4 genuine and 5/5 impostors |
+| Embeddings | 272 of 300 crops, 28 had no detectable face |
+| Top-1 | 267/272, 98.2% |
+| Genuine distance | mean 0.201, p90 0.294, max 0.426 |
+| Impostor distance | mean 0.378, p90 0.433, min 0.258, max 0.464 |
+| Equal error | 8.3% at 0.30 |
+| Youden point | 0.28: genuine 87.5%, impostor 3.3% |
 
-The default threshold accepts every measured impostor. The dataset is far too
-small to set a production value from it, so treat these numbers as a smoke
-test, not a calibration. Collect at least five people with several images each,
-in the lighting and camera positions you will deploy, then rerun before
-choosing thresholds.
+The P1L leaving condition was held out and scored at the thresholds chosen on
+P1E: top-1 292/292 (100%), genuine mean 0.204, impostor mean 0.362. At
+`known_threshold = 0.28` it accepted 92.1% of genuine pairs and 9.2% of
+impostors. At `unknown_threshold = 0.35` it kept 100% of genuine pairs and
+rejected 62.3% of impostors.
 
-## 9. Hardware runs
+The local two-person photo set (`data/dataset`) gave 21 embeddings, 21/21 top-1,
+genuine mean 0.136 (max 0.258), and impostor mean 0.447 (min 0.430). Every
+threshold from 0.26 to 0.42 separated the two groups completely.
+
+The shipped defaults are now `known_threshold = 0.28` and
+`unknown_threshold = 0.38`. They are the Youden point of both ChokePoint
+conditions, keep 98.9% of P1E genuine and 100% of P1L genuine pairs, and reject
+55.5% and 44.2% of their impostors. The old 0.6 default accepted every measured
+impostor. Full tables and the gallery-size caveat are in `docs/calibration.md`.
+
+## 9. Four-video latency probe
+
+`tools/video_latency_probe.py` builds four real capture threads around
+`VideoFileSource`, consumes inference on a 150 ms thread, and polls every
+`LatestFrame` at 15 ms. The videos are the six ChokePoint clips rebuilt by
+`scripts/build_chokepoint.py`.
+
+```powershell
+& $py tools\video_latency_probe.py --video-dir data\chokepoint\videos `
+    --cameras 4 --seconds 15 --inference-delay-ms 150 --json
+```
+
+Recorded on 2026-11-14:
+
+| Measure | Value |
+|---|---|
+| Display frame age | p50 32 ms, p95 63 ms, p99 78 ms, max 110 ms |
+| Samples | 3730 over 15.3 s (4 cameras at 15 ms polls) |
+| Per-camera frames | 226 to 229, all reconnects 0 |
+| Inference sent | 264 frames |
+| Inference dropped | 164 |
+
+The slow inference consumer filled the queue and dropped 164 frames while the
+display p95 stayed at 63 ms. That is the display invariant under a file-backed
+four-camera load. It does not replace the four 1080p hardware run below.
+
+## 10. Hardware runs
 
 These are the same gates as `docs/e2e-test-plan.md`, with the gray-box checks
 added. Record the date, machine, camera models, and the report output.
@@ -245,12 +285,12 @@ added. Record the date, machine, camera models, and the report output.
    `capture.offline_notify_after_s`. Pass: one offline event, one online event,
    no duplicate offline rows.
 
-## 10. What is still not automated
+## 11. What is still not automated
 
 - A GPU and a physical camera in CI.
 - Installer and portable zip.
 - The clean-VM start.
 - Camera secrets in the OS keyring. They are still plain TOML.
-- A production calibration set with enough people to set `known_threshold`.
+- A four 1080p hardware run. The four-video file-backed probe is automated.
 
 Everything else in this plan has a repository test or a recorded probe run.

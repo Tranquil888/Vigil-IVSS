@@ -152,6 +152,7 @@ class MainWindow(QMainWindow):
         ]
         for page in self.pages:
             self.stack.addWidget(page)
+            page.feedback_handler = self.show_action_status
 
         self.nav_buttons = []
         self.nav_group = QButtonGroup(self)
@@ -301,6 +302,11 @@ class MainWindow(QMainWindow):
     def notify(self, title: str, body: str) -> None:
         """Safe to call from any thread; the bridge queues it onto the GUI thread."""
         self.toast_bridge.message.emit(title, body)
+
+    def show_action_status(self, message: str, tone: str = "info") -> None:
+        """Mirror a page action in the status bar. GUI thread only."""
+        timeout = 6000 if tone == "info" else 12000
+        self.statusBar().showMessage(message, timeout)
 
     def _show_toast(self, title: str, body: str) -> None:
         self.tray.notify(title, body)

@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMessageBox,
+    QPlainTextEdit,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -78,7 +79,13 @@ class CamerasPage(Page):
         editor_layout.addWidget(heading)
 
         self.name_field = FieldRow("Name", QLineEdit(), "")
-        self.source_field = FieldRow("Stream address", QLineEdit(), "")
+        source_edit = QPlainTextEdit()
+        source_edit.setPlaceholderText(
+            "0\nrtsp://user:pass@host/stream\nC:\\videos\\clip.mp4"
+        )
+        source_edit.setFixedHeight(64)
+        source_edit.setTabChangesFocus(True)
+        self.source_field = FieldRow("Stream address", source_edit, "")
         self.enabled_field = FieldRow("Enabled", QCheckBox(), False)
         self.stream_field = FieldRow(
             "Analysis stream",
@@ -97,13 +104,17 @@ class CamerasPage(Page):
         for row in self._rows:
             editor_layout.addWidget(row)
 
+        hint = QLabel(
+            "One entry per line: a camera index, a stream URL, or video files "
+            "that play in order and loop."
+        )
+        hint.setObjectName("Muted")
+        hint.setWordWrap(True)
+        editor_layout.addWidget(hint)
+
         self.state_label = QLabel("State: unknown")
         self.state_label.setObjectName("Muted")
         editor_layout.addWidget(self.state_label)
-        self.status_label = QLabel("")
-        self.status_label.setObjectName("Muted")
-        self.status_label.setWordWrap(True)
-        editor_layout.addWidget(self.status_label)
         editor_layout.addStretch(1)
 
         editor_buttons = QHBoxLayout()
@@ -165,7 +176,6 @@ class CamerasPage(Page):
         state = self.context.manager.state(camera.id)
         state_text = getattr(state, "value", state) or "unknown"
         self.state_label.setText("State: %s" % state_text)
-        self.status_label.setText("")
 
     # -- actions -------------------------------------------------------
 
@@ -189,6 +199,7 @@ class CamerasPage(Page):
     def remove_camera(self) -> None:
         camera = self._selected
         if camera is None:
+            self._report(False, "Select a camera before removing one.")
             return
         answer = QMessageBox.question(
             self,
@@ -209,6 +220,7 @@ class CamerasPage(Page):
     def save_selected(self) -> None:
         camera = self._selected
         if camera is None:
+            self._report(False, "Select a camera before saving one.")
             return
         try:
             camera.name = self.name_field.value().strip()
@@ -244,10 +256,7 @@ class CamerasPage(Page):
         return True, "Saved and applied. %d camera(s) running." % active
 
     def _report(self, ok: bool, message: str) -> None:
-        self.status_label.setObjectName("Muted" if ok else "Danger")
-        self.status_label.style().unpolish(self.status_label)
-        self.status_label.style().polish(self.status_label)
-        self.status_label.setText(message)
+        self.report_action(message, "info" if ok else "error")
 
     def _select_camera(self, camera_id: str) -> None:
         for index in range(self.list_widget.count()):

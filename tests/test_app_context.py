@@ -32,6 +32,15 @@ def noisy_frame(index):
     return rng.integers(0, 255, (128, 128, 3), dtype=np.uint8)
 
 
+def wait_for(predicate, timeout=5.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.01)
+    return False
+
+
 def test_start_and_shutdown_join_every_thread(tmp_path):
     context = AppContext(
         build_config(),
@@ -170,6 +179,33 @@ def test_apply_config_adds_a_camera_without_a_restart(tmp_path):
         context.shutdown(timeout=1.0)
 
 
+def test_apply_config_starts_the_first_camera_enabled_after_start(tmp_path):
+    config = build_config()
+    config.cameras[0].enabled = False
+    context = AppContext(
+        config,
+        data_path=tmp_path,
+        source_factory=lambda camera: FakeSource(
+            read_delay=0.01, frame_factory=noisy_frame
+        ),
+        backend=FakeBackend(),
+    )
+    try:
+        context.start()
+        assert context.manager.camera_ids == []
+
+        config.cameras[0].enabled = True
+        summary = context.apply_config()
+
+        assert summary["cameras"] == 1
+        assert wait_for(
+            lambda: context.manager._supervisors[0].is_alive()
+            and context.manager.display_queue("front").generation > 0
+        )
+    finally:
+        context.shutdown(timeout=2.0)
+
+
 def test_apply_config_rebuilds_when_the_global_motion_section_changes(tmp_path):
     context = AppContext(build_config(), data_path=tmp_path, backend=FakeBackend())
     try:
@@ -201,10 +237,12 @@ def test_apply_config_pushes_face_thresholds_into_the_worker(tmp_path):
     context = AppContext(build_config(), data_path=tmp_path, backend=FakeBackend())
     try:
         context.config.face.track_iou = 0.5
+        context.config.face.unknown_threshold = 0.6
         context.config.face.known_threshold = 0.45
         context.apply_config()
 
         assert context.inference._face.known_threshold == 0.45
+        assert context.inference._face.unknown_threshold == 0.6
         assert context.inference._face.track_iou == 0.5
     finally:
         context.shutdown(timeout=1.0)

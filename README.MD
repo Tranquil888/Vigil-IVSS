@@ -150,6 +150,20 @@ letters, digits, `_`, `-`), a display name, and a source:
 - `"rtsp://user:password@192.168.1.10:554/stream2"` for RTSP.
 - A file path for a recorded clip.
 
+A source may list several video files, one per line. Files play in order, the
+playlist loops, and frames are paced to the file's frame rate, so a folder of
+clips behaves like a camera that never goes offline:
+
+```toml
+[[cameras]]
+id = "door"
+name = "Door clips"
+source = '''
+C:\clips\door-morning.mp4
+C:\clips\door-evening.mp4
+'''
+```
+
 Camera, motion, zone, and inference changes apply when you save. A camera or
 motion change rebuilds the capture and motion workers, and the live tiles come
 back on the new cameras. An analysis fps or queue size change is applied in
@@ -188,8 +202,8 @@ from matching without deleting their data.
 
 The defaults are a starting point, not a guarantee:
 
-- `known_threshold = 0.6`: maximum distance for a known match.
-- `unknown_threshold = 0.7`: minimum distance for a stranger. Distances
+- `known_threshold = 0.28`: maximum distance for a known match.
+- `unknown_threshold = 0.38`: minimum distance for a stranger. Distances
   between the two thresholds land in the uncertain band.
 - `margin = 0.05`: the best person must beat the runner-up by this much.
 - `min_votes = 2`: at least this many observations must agree before a
@@ -197,8 +211,12 @@ The defaults are a starting point, not a guarantee:
 - `best_k = 5`: the number of highest-quality observations kept per
   tracklet.
 
-Read `docs/calibration.md` before trusting these numbers with your camera,
-lighting, and photo set.
+The thresholds were calibrated on 25-person ChokePoint face sets and a local
+photo set, not copied from a library default. The old 0.6 default accepted
+every measured impostor. Read `docs/calibration.md` before trusting these
+numbers with your camera, lighting, and photo set: a large gallery may need a
+lower `known_threshold`, and a small high-quality gallery can afford a higher
+one.
 
 ## Models
 
@@ -296,7 +314,27 @@ Recognition quality against a folder-per-person dataset:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\eval_recognition.py --dataset data\dataset `
-    --models models --limit-per-person 8 --require-cnn
+    --models models --limit-per-person 12 --gallery-score min --require-cnn
+```
+
+The ChokePoint cropped-face tars can be turned into a gallery and looping test
+videos without extracting the archives by hand:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\build_chokepoint.py `
+    --archive test-dataset\P1E.tar
+.\.venv\Scripts\python.exe scripts\eval_recognition.py `
+    --dataset data\chokepoint\faces --models models --limit-per-person 12 `
+    --gallery-score min --detector dlib_cnn --require-cnn --json
+```
+
+Four file-backed cameras, a slow inference consumer, and a display latency
+report:
+
+```powershell
+.\.venv\Scripts\python.exe tools\video_latency_probe.py `
+    --video-dir data\chokepoint\videos --cameras 4 --seconds 15 `
+    --inference-delay-ms 150 --json
 ```
 
 A live gray-box report from a synthetic camera:

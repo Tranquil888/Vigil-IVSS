@@ -38,9 +38,10 @@ few photos per person to be meaningful.
 and the runner-up person must be worse by at least `margin`. One frame can
 never produce a known event on its own.
 
-The defaults are `known_threshold = 0.6`, `unknown_threshold = 0.7`, and
-`margin = 0.05`. The gap between the two thresholds is the uncertain band
-and must stay positive. Vigil refuses to load a config where
+The defaults are `known_threshold = 0.28`, `unknown_threshold = 0.38`, and
+`margin = 0.05`. They come from the leave-one-out measurements recorded below.
+The gap between the two thresholds is the uncertain band and must stay
+positive. Vigil refuses to load a config where
 `unknown_threshold <= known_threshold`.
 
 ## Leave-one-out measurement
@@ -68,6 +69,31 @@ For each enrolled photo:
 Leave-one-out matters most when a person has only one photo. That photo
 cannot contribute a genuine sample, and it should not be compared with
 itself.
+
+## Run the repository evaluator
+
+`scripts/eval_recognition.py` does the same leave-one-out measurement on a
+folder-per-person image set and prints the calibration directly:
+
+```powershell
+python scripts\eval_recognition.py --dataset data\dataset --models models `
+    --limit-per-person 12 --gallery-score min --require-cnn --json
+```
+
+The JSON contains `genuine`, `impostor`, a sweep from 0.20 to 0.60, the equal
+error point, the Youden point, and `suggested_known` / `suggested_unknown`.
+Use `--gallery-score top3_mean` to match that setting in the config. The
+script never writes to the database and never enrolls a person.
+
+For the ChokePoint face set, `scripts/build_chokepoint.py` turns the downloaded
+tars into a gallery and test videos first:
+
+```powershell
+python scripts\build_chokepoint.py --archive test-dataset\P1E.tar
+python scripts\eval_recognition.py --dataset data\chokepoint\faces `
+    --models models --limit-per-person 12 --gallery-score min `
+    --detector dlib_cnn --require-cnn --json
+```
 
 ## Read your own database
 
@@ -183,6 +209,61 @@ margin and accept more confusion between those two people.
    days.
 7. Recalibrate after adding a camera, moving a camera, or changing a large
    part of the photo set.
+
+## Measured evidence
+
+These runs were recorded on 2026-11-14 with the dlib ResNet model on CUDA.
+Commands are in the section above and the full JSON is reproducible.
+
+ChokePoint portal 1, entering condition (`P1E.tar`), 25 people, 12 crops per
+person spread across 12 camera sequences, leave-one-out with `gallery_score =
+min`:
+
+| Measure | Value |
+|---|---|
+| Embeddings | 272 of 300 crops, 28 had no detectable face |
+| Top-1 | 267/272, 98.2% |
+| Genuine distance | mean 0.201, p90 0.294, max 0.426 |
+| Impostor distance | mean 0.378, p90 0.433, min 0.258, max 0.464 |
+| Equal error | 8.3% at 0.30 |
+| Youden point | 0.28: genuine 87.5%, impostor 3.3% |
+
+Portal 1, leaving condition (`P1L.tar`) is the holdout set. It was scored
+without changing the thresholds chosen on P1E:
+
+| Measure | Value |
+|---|---|
+| Embeddings | 292 of 300 crops |
+| Top-1 | 292/292, 100% |
+| Genuine distance | mean 0.204, p90 0.268, max 0.341 |
+| Impostor distance | mean 0.362, p90 0.433, min 0.227, max 0.480 |
+| `known_threshold = 0.28` | genuine 92.1%, impostor 9.2% |
+| `unknown_threshold = 0.35` | keeps 100% of genuine, rejects 62.3% of impostors |
+
+The local two-person photo set (`data/dataset`) is the opposite extreme: few
+people and many near-identical frames.
+
+| Measure | Value |
+|---|---|
+| Embeddings | 21 of 24 images |
+| Top-1 | 21/21, 100% |
+| Genuine distance | mean 0.136, max 0.258 |
+| Impostor distance | mean 0.447, min 0.430 |
+| Any threshold 0.26 to 0.42 | genuine 100%, impostor 0% |
+
+The shipped known default, 0.28, is the Youden point of both ChokePoint
+conditions. The shipped unknown default, 0.38, keeps 98.9% of P1E genuine
+pairs and 100% of P1L genuine pairs, while pushing 55.5% and 44.2% of their
+impostors into the stranger bucket. On the small local photo set the known threshold accepts every genuine
+pair and no impostor.
+
+The ChokePoint crops are 96x96 and were captured across sessions and cameras,
+so they are a deliberately hard set. A household gallery with fewer people
+usually separates better. If a large gallery still produces too many uncertain
+events, add photos first, then lower `known_threshold` toward 0.26 rather than
+returning to the old 0.6 default. If genuine people are landing in the
+uncertain band, raise `known_threshold` toward 0.35 and recalibrate. The
+measurements, not the default, decide.
 
 ## Limits
 

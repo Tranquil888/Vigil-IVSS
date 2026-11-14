@@ -198,11 +198,8 @@ class SettingsPage(Page):
         footer = QHBoxLayout()
         self.advanced_box = QCheckBox("Show advanced settings")
         self.advanced_box.toggled.connect(self._set_advanced)
-        self.status_label = QLabel("")
-        self.status_label.setObjectName("Muted")
-        self.status_label.setWordWrap(True)
         footer.addWidget(self.advanced_box)
-        footer.addWidget(self.status_label, 1)
+        footer.addStretch(1)
         self.save_button = QPushButton("Save settings")
         self.save_button.setObjectName("Primary")
         self.save_button.clicked.connect(self.save)
@@ -302,7 +299,4 @@ class SettingsPage(Page):
             row.set_value(getattr(section, attribute))
 
     def _report(self, ok: bool, message: str) -> None:
-        self.status_label.setObjectName("Muted" if ok else "Danger")
-        self.status_label.style().unpolish(self.status_label)
-        self.status_label.style().polish(self.status_label)
-        self.status_label.setText(message)
+        self.report_action(message, "info" if ok else "error")

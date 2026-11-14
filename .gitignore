@@ -166,6 +166,7 @@ checkpoints/
 # Vigil specific - Data directories
 data/
 dataset/
+test-dataset/
 encodings.pickle
 
 # Vigil specific - Generated files
@@ -200,6 +201,7 @@ debug_*.py
 #Other
 numberreestr.txt
 dlib-env
+VigilDiagnostics-be-updated.txt
 
 # Local dlib model files, fetched with scripts/fetch_models.py
 /models/

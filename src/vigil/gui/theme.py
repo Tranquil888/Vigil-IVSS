@@ -118,6 +118,30 @@ QLabel#Danger {{
 QLabel#Warning {{
     color: {warn};
 }}
+QLabel#FeedbackInfo {{
+    background: {panel_alt};
+    border: 1px solid {line};
+    border-left: 3px solid {accent};
+    border-radius: 4px;
+    padding: 8px 10px;
+    color: {text};
+}}
+QLabel#FeedbackWarning {{
+    background: {panel_alt};
+    border: 1px solid {line};
+    border-left: 3px solid {warn};
+    border-radius: 4px;
+    padding: 8px 10px;
+    color: {text};
+}}
+QLabel#FeedbackError {{
+    background: {panel_alt};
+    border: 1px solid {line};
+    border-left: 3px solid {danger};
+    border-radius: 4px;
+    padding: 8px 10px;
+    color: {text};
+}}
 QLabel#Mono {{
     font-family: "Cascadia Mono", "Consolas", monospace;
 }}
@@ -147,6 +171,10 @@ QToolButton#RailButton:hover {{
     background: {panel_alt};
     color: {text};
 }}
+QToolButton#RailButton:pressed {{
+    background: {line};
+    color: {text};
+}}
 QToolButton#RailButton:checked {{
     background: {panel};
     border-color: {line};
@@ -166,7 +194,9 @@ QPushButton:hover {{
     border-color: {accent};
 }}
 QPushButton:pressed {{
-    background: {panel};
+    background: {line};
+    border-color: {accent};
+    color: {text};
 }}
 QPushButton:focus {{
     border-color: {accent};
@@ -182,9 +212,19 @@ QPushButton#Primary {{
     color: {on_accent};
     font-weight: 600;
 }}
+QPushButton#Primary:pressed {{
+    background: {accent};
+    border-color: {text};
+    color: {on_accent};
+}}
 QPushButton#Danger {{
     color: {danger};
     border-color: {danger};
+}}
+QPushButton#Danger:pressed {{
+    background: {panel};
+    border-color: {danger};
+    color: {danger};
 }}
 QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QPlainTextEdit, QTextEdit {{
     background: {panel};

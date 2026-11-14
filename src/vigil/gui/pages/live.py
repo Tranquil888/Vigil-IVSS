@@ -39,11 +39,11 @@ class LivePage(Page):
         self.grid_button.setCheckable(True)
         self.grid_button.setChecked(True)
         self.grid_button.setAutoExclusive(True)
-        self.grid_button.clicked.connect(lambda: self.set_mode("grid"))
+        self.grid_button.clicked.connect(self.show_grid)
         self.single_button = QPushButton("Single")
         self.single_button.setCheckable(True)
         self.single_button.setAutoExclusive(True)
-        self.single_button.clicked.connect(lambda: self.set_mode("single"))
+        self.single_button.clicked.connect(self.show_single_mode)
         self.camera_combo = QComboBox()
         self.camera_combo.setMinimumWidth(180)
         self.camera_combo.currentTextChanged.connect(self._show_single)
@@ -80,6 +80,17 @@ class LivePage(Page):
         self.scheme = scheme
         for tile in list(self.tiles.values()) + list(self.single_tiles.values()):
             tile.set_scheme(scheme)
+
+    def show_grid(self) -> None:
+        self.set_mode("grid")
+        self.report_action("Showing the camera grid.")
+
+    def show_single_mode(self) -> None:
+        self.set_mode("single")
+        camera = self.camera_combo.currentText()
+        self.report_action(
+            "Showing %s." % camera if camera else "No camera to show."
+        )
 
     def set_mode(self, mode: str) -> None:
         if mode == "grid":

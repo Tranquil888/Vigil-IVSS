@@ -60,3 +60,49 @@ Runtime for verification: conda env dlib-cuda via dlib-env\Scripts\python.exe (C
 - Remaining: keyring or DPAPI camera secrets, clean-VM CPU bundle, CUDA bundle on the RTX 3050, installer and portable zip, four-camera hardware run, and a dataset large enough to calibrate thresholds.
 - Ruling: `models/` is gitignored. The three files are fetched, not redistributed, and the local copy is about 123 MB.
 
+
+## ChokePoint calibration pass (2026-11-14)
+
+- Dataset: the supplied ChokePoint archives contain 96x96 cropped faces, not
+  800x600 scene frames. `scripts/build_chokepoint.py` reads the tar directly,
+  labels subjects `P1-0001` / `P2-0001` so the two portals never collide, spreads
+  gallery crops across camera sequences, and reconstructs looping videos from
+  the face crops.
+  - Ruling: E and L are entering and leaving sequences of the same portal, so
+    `P1E` and `P1L` share subject labels. Portals 1 and 2 are different subject
+    sets and are kept apart.
+  - Ruling: a 96x96 face crop gives the motion detector nothing to see, so the
+    video builder pastes each crop onto a 640x480 canvas and sways it. The
+    result is a face video, not the original scene, and the docs say so.
+- CNN recognition on portal 1 entering (`P1E.tar`), 25 people and 12 crops per
+  person across 12 sequences: 272 embeddings, top-1 267/272 (98.2%), genuine
+  mean 0.201 (max 0.426), impostor mean 0.378 (min 0.258), equal error 8.3% at
+  0.30, Youden point 0.28 (genuine 87.5%, impostor 3.3%).
+- Holdout on portal 1 leaving (`P1L.tar`) at the P1E threshold: top-1 292/292
+  (100%), genuine mean 0.204, impostor mean 0.362, known 0.28 accepts 92.1% of
+  genuine and 9.2% of impostors, unknown 0.35 keeps 100% of genuine and rejects
+  62.3% of impostors.
+- Local two-person photo set: 21 embeddings, top-1 21/21, genuine mean 0.136
+  (max 0.258), impostor mean 0.447 (min 0.430). Every threshold from 0.26 to
+  0.42 separated the groups completely.
+- Ruling: change `known_threshold` from 0.6 to 0.28 and `unknown_threshold`
+  from 0.7 to 0.38. Both ChokePoint conditions put the Youden point at 0.28,
+  and the old 0.6 accepted every measured impostor. The 0.38 unknown threshold
+  keeps 98.9% of P1E genuine and 100% of P1L genuine pairs. This deviates from
+  the build plan's pinned defaults on measured evidence; the calibration caveat
+  for gallery size is in `docs/calibration.md`.
+- Ruling: keep `gallery_score = "min"`. `top3_mean` raised top-1 from 98.2% to
+  98.9% but raised the equal error from 8.3% to 8.8% and moved the Youden point
+  to 0.30 with a 5.2% impostor accept rate, so `min` stayed the default.
+- `scripts/eval_recognition.py` now reports the equal error point, the Youden
+  point, a 0.20 to 0.60 sweep, and suggested thresholds. Progress lines move to
+  stderr under `--json` so redirected output is valid JSON.
+- Four-video latency: `tools/video_latency_probe.py` runs four real
+  `VideoFileSource` capture threads and a 150 ms inference consumer over the
+  ChokePoint clips. Display age p50 32 ms, p95 63 ms, p99 78 ms, max 110 ms;
+  3730 samples in 15.3 s; 164 inference drops; zero reconnects. Recorded in
+  `docs/graybox-test-plan.md` and `docs/e2e-test-plan.md`.
+- Verification: 223 passed in 24.59 s on CPython 3.9.23 with
+  `dlib-env\Scripts\python.exe -m pytest -q`.
+- Remaining: keyring or DPAPI camera secrets, clean-VM CPU bundle, CUDA bundle
+  on the RTX 3050, installer and portable zip, and the four 1080p hardware run.

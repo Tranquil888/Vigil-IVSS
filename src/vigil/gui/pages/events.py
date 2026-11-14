@@ -69,7 +69,7 @@ class EventsPage(Page):
         filters.addWidget(self.limit_spin)
 
         self.refresh_button = QPushButton("Refresh")
-        self.refresh_button.clicked.connect(self.refresh)
+        self.refresh_button.clicked.connect(self.refresh_from_button)
         filters.addWidget(self.refresh_button)
         filters.addStretch(1)
         self.header.addLayout(filters)
@@ -109,7 +109,16 @@ class EventsPage(Page):
         self.view.set_retry(self.refresh)
         self.refresh()
 
-    def refresh(self) -> None:
+    def refresh_from_button(self) -> None:
+        count = self.refresh()
+        if count is None:
+            return
+        if count:
+            self.report_action("Loaded %d event(s)." % count)
+        else:
+            self.report_action("No events match the current filters.")
+
+    def refresh(self) -> Optional[int]:
         camera_id = self.camera_combo.currentData() or None
         event_type = self.type_combo.currentData() or None
         limit = int(self.limit_spin.value())
@@ -120,7 +129,7 @@ class EventsPage(Page):
             )
         except Exception as err:
             self.show_error("Could not read events: %s" % err)
-            return
+            return None
         self._rows = rows
         self.table.setRowCount(len(rows))
         mono = QFont("Cascadia Mono", 9)
@@ -142,6 +151,7 @@ class EventsPage(Page):
             self.show_empty()
         else:
             self.show_content()
+        return len(rows)
 
     def _on_selection(self) -> None:
         selected = self.table.currentRow()

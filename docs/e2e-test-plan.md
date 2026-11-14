@@ -89,6 +89,22 @@ higher than the synthetic harness in `docs/latency.md` because they include
 MJPG decode. That is the point of this test: it measures a frame that was
 actually encoded, decoded, captured, and read by the display consumer.
 
+### Four file-backed cameras
+
+`tools/video_latency_probe.py` repeats the same idea with four real
+`VideoFileSource` capture threads, a 15 ms display poll, and a 150 ms inference
+consumer. Recorded on 2026-11-14 with four ChokePoint face clips:
+
+| Measure | Value |
+|---|---|
+| Display frame age | p50 32 ms, p95 63 ms, p99 78 ms, max 110 ms |
+| Samples | 3730 over 15.3 s |
+| Per-camera frames | 226 to 229, reconnects 0 |
+| Inference dropped | 164 |
+
+The queue dropped 164 frames while the display p95 stayed at 63 ms. This is a
+file-backed four-camera load, not the four 1080p hardware run below.
+
 ## Manual hardware matrix
 
 These runs cannot be made deterministic in a repository test. Record the
@@ -166,12 +182,14 @@ hardware, not because the harness is missing:
 - No installer or portable zip.
 - No clean-VM run of the CPU bundle and no run of the CUDA bundle on the
   reference GPU.
-- No four-camera hardware run, so the 50 ms gate has only been shown with a
-  single synthetic or file-backed camera.
-- The recognition dataset has two people. The default `known_threshold` of
-  0.6 accepts every measured impostor, so production thresholds are not
-  calibrated yet.
+- No four-camera hardware run, so the 50 ms gate has only been shown with
+  synthetic or file-backed cameras, including the four-video probe above.
+- Recognition thresholds are calibrated on ChokePoint and the local photo set
+  (`known_threshold = 0.28`, `unknown_threshold = 0.38`), but every deployment
+  still needs its own gallery measurement. `docs/calibration.md` has the
+  procedure and the gallery-size caveat.
 
 The closed items, one unknown visit per row, retention pruning, CUDA and cuDNN
-fallback, and the Diagnostics page, now have tests or a recorded probe run.
+fallback, the Diagnostics page, and recognition threshold calibration now have
+tests or a recorded probe run.
 The full list is in `docs/plan-gap-analysis.md`.

@@ -9,8 +9,8 @@ def test_defaults_match_the_plan():
     assert cfg.inference.analysis_fps == 5
     assert cfg.inference.device == "auto"
     assert cfg.face.detector == "dlib_cnn"
-    assert cfg.face.known_threshold == 0.6
-    assert cfg.face.unknown_threshold == 0.7
+    assert cfg.face.known_threshold == 0.28
+    assert cfg.face.unknown_threshold == 0.38
     assert cfg.face.margin == 0.05
     assert cfg.face.min_votes == 2
     assert cfg.face.min_face_px == 48

@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QPlainTextEdit,
     QPushButton,
     QSpinBox,
     QWidget,
@@ -67,6 +68,8 @@ class FieldRow(QWidget):
             return widget.currentText()
         if isinstance(widget, (QSpinBox, QDoubleSpinBox)):
             return widget.value()
+        if isinstance(widget, QPlainTextEdit):
+            return widget.toPlainText()
         if isinstance(widget, QLineEdit):
             return widget.text()
         return None
@@ -81,5 +84,7 @@ class FieldRow(QWidget):
                 widget.setCurrentIndex(index)
         elif isinstance(widget, (QSpinBox, QDoubleSpinBox)):
             widget.setValue(value)
+        elif isinstance(widget, QPlainTextEdit):
+            widget.setPlainText("" if value is None else str(value))
         elif isinstance(widget, QLineEdit):
             widget.setText("" if value is None else str(value))

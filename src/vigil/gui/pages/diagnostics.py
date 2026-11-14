@@ -33,7 +33,7 @@ class DiagnosticsPage(Page):
         self.config_path = Path(config_path) if config_path else None
 
         self.refresh_button = QPushButton("Refresh")
-        self.refresh_button.clicked.connect(self.refresh)
+        self.refresh_button.clicked.connect(self.refresh_from_button)
         self.copy_button = QPushButton("Copy report")
         self.copy_button.clicked.connect(self.copy_report)
         self.reload_button = QPushButton("Reload config")
@@ -64,39 +64,59 @@ class DiagnosticsPage(Page):
         if self.isVisible():
             self.refresh()
 
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        # The constructor refreshes before the workers start. Refresh again on
+        # every visit so a thread that died later does not stay hidden.
+        self.refresh()
+
+    def refresh_from_button(self) -> None:
+        if self.refresh():
+            self.report_action("Report updated.")
+
     def report(self) -> str:
         report = build_report(self.context)
         if self.config_path is not None:
             report["paths"]["config"] = str(self.config_path)
         return format_report(report)
 
-    def refresh(self) -> None:
+    def refresh(self) -> bool:
         try:
             text = self.report()
         except Exception as err:
             self.show_error("Could not read diagnostics: %s" % err)
-            return
+            return False
         self.text.setPlainText(text)
         self.updated_label.setText("Updates every 2.5 seconds while this page is open.")
         self.show_content()
+        return True
 
     def copy_report(self) -> None:
         clipboard = QGuiApplication.clipboard()
-        if clipboard is not None:
-            clipboard.setText(self.report())
+        try:
+            text = self.report()
+        except Exception as err:
+            self.report_action("Could not build the report: %s" % err, "error")
+            return
+        if clipboard is None:
+            self.report_action("The clipboard is not available.", "error")
+            return
+        clipboard.setText(text)
+        self.report_action("Report copied to the clipboard.")
 
     def reload_config(self) -> None:
         if self.config_path is None:
+            self.report_action("No config file is set for this app.", "error")
             return
         action = getattr(self.context, "reload_config", None)
         if not callable(action):
-            self.updated_label.setText("This context cannot reload a config file.")
+            self.report_action("This context cannot reload a config file.", "error")
             return
         try:
             action(self.config_path)
         except Exception as err:
-            self.updated_label.setText("Reload failed: %s" % err)
+            self.report_action("Reload failed: %s" % err, "error")
             return
         self.refresh()
-        self.updated_label.setText("Config reloaded from %s." % self.config_path)
+        self.report_action("Config reloaded from %s." % self.config_path)
         self.config_reloaded.emit()
