@@ -11,18 +11,22 @@ as a single process with background workers.
 
 ## Screenshots
 
-The four feeds are ChokePoint test clips played from disk.
+The feeds are four camera sample clips played from disk. The resident is
+enrolled from the indoor clip; the delivery visitor at the front door is not
+enrolled, so the console reports an unknown face. The person names shown are
+demo labels, not real identities.
 
-![Live page with four cameras and recognition overlays](docs/images/live-grid.png)
+![Live page with four cameras and recognition overlays](docs/images/live-grid.jpg)
 
-Four cameras on the Live page. Each tile paints from its own last-frame slot,
-so the display keeps its rate while the inference worker names the people in
-view.
+Four cameras on the Live page in a 2x2 grid. Each tile paints from its own
+last-frame slot, so the display keeps its rate while the inference worker names
+the people in view. The resident is known and the visitor at the front door is
+unknown.
 
 ![Events page](docs/images/events.png)
 
-The Events page keeps one row per visit with camera, type, person, and score,
-and shows the full record underneath.
+The Events page keeps one row per visit with camera, type, person, and score.
+Known faces, uncertain faces, strangers, and motion all land in the same log.
 
 ![Settings page](docs/images/settings.png)
 
