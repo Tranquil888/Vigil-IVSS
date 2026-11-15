@@ -33,7 +33,7 @@ display path imports no dlib code. Guarded by
 | TOML and Pydantic config | Done | Strict models, defaults, TOML round trip, live apply, and reload from disk |
 | Five GUI pages | Deviation | Six pages: Cameras, Live, Events, People, Settings, Diagnostics. There is still no zone polygon editor and the camera page does not expose per-camera motion or zone overrides. |
 | Tray notification and optional sound | Done | `notify/notifier.py`, `gui/tray.py` |
-| PyInstaller `--onedir`, CPU and CUDA builds, first-run probe | Partial | Bundle, scripts, and the Diagnostics page exist. No installer, no portable zip, and no CUDA bundle run on the reference GPU. |
+| PyInstaller `--onedir`, CPU and CUDA builds, first-run probe | Partial | Bundle, portable zip, installer, and the Diagnostics page exist. The CUDA bundle ran on the RTX 3050. A clean-VM run is still manual. |
 
 ## 2. Reference hardware and CUDA path
 
@@ -203,8 +203,9 @@ These were the gaps that stopped the plan's definition of done:
    `dlib_cnn cuda=True cudnn=True ready on GPU`. The clean Windows VM run is a
    manual step in `docs/release-checklist.md`.
 3. Installer and portable zip. **Closed.** `dist\Vigil-portable-2.0.zip`
-   (635.7 MB) and `dist\installer\Vigil-2.0-setup.exe` (386.5 MB) were built,
-   each with a `.sha256` file. `scripts/release_check.ps1` passes every check.
+   (541.9 MB) and `dist\installer\Vigil-2.0-setup.exe` (331.9 MB) were built
+   from the current tree, each with a `.sha256` file.
+   `scripts/release_check.ps1` passes every check.
 4. Reference-hardware latency run with four 1080p cameras. **Software half
    closed.** The real CNN backend on four 1920x1080 video cameras measured a
    display p95 of 62.0 ms, against 47.0 ms with no inference load. The physical

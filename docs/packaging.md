@@ -75,15 +75,16 @@ The spec:
 
 ## Result on this machine
 
-Recorded on 13 November 2026:
+Recorded on 15 November 2026:
 
 - PyInstaller 6.22.3, PyInstaller hooks 2026.10.
 - CPython 3.9.23 from the conda environment `dlib-cuda`, used through the
   `dlib-env` virtual environment.
 - PySide6-Essentials 6.9.3, OpenCV 4.12.0, dlib 20.0.0 with CUDA.
-- Build time: about 68 seconds with `--clean`.
-- Bundle size: about 927 MB. dlib, OpenCV, Qt, and the CUDA math libraries
-  account for most of it.
+- Build time: about 70 seconds with `--clean`.
+- Bundle size: about 939 MB. dlib, OpenCV, Qt, and the CUDA math libraries
+  account for most of it. The portable zip is 541.9 MB and the installer is
+  331.9 MB.
 - `dist\Vigil\_internal` contains the checkmark PNGs, the dlib package
   directory, `cudart64_110.dll`, `cudnn64_9.dll`, `cublas64_11.dll`, and
   `cublasLt64_11.dll`. The two cublas files alone are about 603 MB, because

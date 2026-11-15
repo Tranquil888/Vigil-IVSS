@@ -87,6 +87,20 @@ The script fails with instructions when `iscc.exe` is absent. It never
 downloads the compiler. The result is `dist\installer\Vigil-2.0-setup.exe` plus
 a `.sha256` file.
 
+Recorded on 15 November 2026 from commit `5d1850a`:
+
+```text
+dist\Vigil-portable-2.0.zip    541.9 MB
+sha256  121062C76C53F6D213871AEB8453CEE899910E3373C6B5D7872188B833E01109
+
+dist\installer\Vigil-2.0-setup.exe   331.9 MB
+sha256  615FA6D8B0C9133F20C47F065E5A5BB9C3E653994B4E6E9A20B071E64707A6A5
+```
+
+`scripts\release_check.ps1 -ModelsDir "$env:LOCALAPPDATA\Vigil\models"` passed
+all nine checks against that bundle, including
+`face backend selected: dlib_cnn cuda=True cudnn=True ready on GPU`.
+
 ## 4. Four 1080p cameras
 
 Status: the software path is measured with four 1080p video files. Four

@@ -288,9 +288,8 @@ added. Record the date, machine, camera models, and the report output.
 ## 11. What is still not automated
 
 - A GPU and a physical camera in CI.
-- Installer and portable zip.
-- The clean-VM start.
-- Camera secrets in the OS keyring. They are still plain TOML.
+- The clean-VM start. The CUDA bundle and the release artifacts are checked
+  locally by `scripts/release_check.ps1`.
 - A four 1080p hardware run. The four-video file-backed probe is automated.
 
 Everything else in this plan has a repository test or a recorded probe run.

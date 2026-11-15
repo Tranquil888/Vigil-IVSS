@@ -158,8 +158,9 @@ date, machine, camera models, and the commands used.
 - Pass: the Diagnostics page reports CUDA and cuDNN as available, the detector
   reports `dlib_cnn`, and the bundle does not silently fall back to CPU or HOG
   without a visible warning.
-- The local probe already reports `dlib_cnn`, CUDA, and cuDNN on this machine.
-  The missing evidence is the run of the frozen bundle on the reference GPU.
+- The frozen bundle was started here with the installed model directory and
+  logged `face backend selected: dlib_cnn cuda=True cudnn=True ready on GPU`.
+  A run on the separate release machine is still open.
 
 ## Pass criteria for the MVP
 
@@ -176,12 +177,8 @@ date, machine, camera models, and the commands used.
 The automated suite does not cover these because they are product gaps or need
 hardware, not because the harness is missing:
 
-- Camera secrets are stored in plain TOML. A keyring or encrypted fallback is
-  not implemented. The `cryptography` package is available, but the DPAPI or
-  keyring design is not chosen yet.
-- No installer or portable zip.
-- No clean-VM run of the CPU bundle and no run of the CUDA bundle on the
-  reference GPU.
+- The clean-VM run of the CPU bundle. The CUDA bundle runs on the reference
+  RTX 3050 and reports the CNN backend on the GPU.
 - No four-camera hardware run, so the 50 ms gate has only been shown with
   synthetic or file-backed cameras, including the four-video probe above.
 - Recognition thresholds are calibrated on ChokePoint and the local photo set
