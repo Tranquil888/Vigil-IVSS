@@ -78,8 +78,7 @@ The spec:
 Recorded on 15 November 2026:
 
 - PyInstaller 6.22.3, PyInstaller hooks 2026.10.
-- CPython 3.9.23 from the conda environment `dlib-cuda`, used through the
-  `dlib-env` virtual environment.
+- CPython 3.9.23 from a conda environment with a dlib build for CUDA.
 - PySide6-Essentials 6.9.3, OpenCV 4.12.0, dlib 20.0.0 with CUDA.
 - Build time: about 70 seconds with `--clean`.
 - Bundle size: about 939 MB. dlib, OpenCV, Qt, and the CUDA math libraries
