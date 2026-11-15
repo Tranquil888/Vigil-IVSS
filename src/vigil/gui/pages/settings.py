@@ -264,7 +264,8 @@ class SettingsPage(Page):
             for section_name, attribute, row in self._bindings:
                 section = getattr(self.config, section_name)
                 setattr(section, attribute, row.value())
-            save_config(self.config_path, self.config)
+            secrets = getattr(self.context, "secrets", None)
+            save_config(self.config_path, self.config, secrets=secrets)
         except Exception as err:
             self._report(False, "The settings were not saved: %s" % err)
             return

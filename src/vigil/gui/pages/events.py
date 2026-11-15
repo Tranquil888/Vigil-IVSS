@@ -5,7 +5,8 @@ from __future__ import annotations
 import time
 from typing import Optional
 
-from PySide6.QtGui import QFont
+from PySide6.QtCore import QRect, Qt
+from PySide6.QtGui import QColor, QFont, QPainter
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -14,6 +15,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QPushButton,
     QSpinBox,
+    QStyledItemDelegate,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
@@ -22,7 +24,31 @@ from PySide6.QtWidgets import (
 )
 
 from ...core.records import EventType
+from ..theme import palette
 from .base import Page
+
+STRANGER_ROLE = Qt.UserRole + 1
+
+
+class StrangerStripeDelegate(QStyledItemDelegate):
+    """Draw the green left edge that marks a stranger row.
+
+    The stripe is painted over the first cell instead of adding a column, so
+    the table keeps its layout and every value stays in the same place.
+    """
+
+    def __init__(self, scheme: str = "dark", parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.scheme = scheme
+
+    def paint(self, painter: QPainter, option, index) -> None:
+        super().paint(painter, option, index)
+        if index.column() != 0 or not index.data(STRANGER_ROLE):
+            return
+        stripe = QRect(
+            option.rect.left(), option.rect.top(), 3, option.rect.height()
+        )
+        painter.fillRect(stripe, QColor(palette(self.scheme)["accent"]))
 
 TYPE_LABELS = {
     EventType.MOTION: "Motion",
@@ -45,6 +71,7 @@ class EventsPage(Page):
         )
         self.context = context
         self._rows = []
+        self.scheme = "dark"
 
         filters = QHBoxLayout()
         filters.setSpacing(8)
@@ -82,6 +109,7 @@ class EventsPage(Page):
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.table.setAlternatingRowColors(True)
+        self.table.setItemDelegate(StrangerStripeDelegate(self.scheme, self.table))
         self.table.verticalHeader().setVisible(False)
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
@@ -108,6 +136,13 @@ class EventsPage(Page):
 
         self.view.set_retry(self.refresh)
         self.refresh()
+
+    def set_scheme(self, scheme: str) -> None:
+        self.scheme = scheme
+        delegate = self.table.itemDelegate()
+        if isinstance(delegate, StrangerStripeDelegate):
+            delegate.scheme = scheme
+        self.table.viewport().update()
 
     def refresh_from_button(self) -> None:
         count = self.refresh()
@@ -145,6 +180,8 @@ class EventsPage(Page):
                 item = QTableWidgetItem(value)
                 if column == 0:
                     item.setFont(mono)
+                    stranger = row.get("type") == EventType.STRANGER
+                    item.setData(STRANGER_ROLE, bool(stranger))
                 self.table.setItem(row_index, column, item)
         self.detail.clear()
         if not rows:

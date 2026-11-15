@@ -177,6 +177,14 @@ If you edit `config.toml` outside the app, use Reload config on the Diagnostics
 page. Adding a person, importing a photo, or disabling a person takes effect
 immediately.
 
+A password in a camera URL is never written to `config.toml`. Saving a source
+such as `rtsp://user:password@host/stream` encrypts the full URL into
+`secrets.json` in the data directory and the config keeps `source = "vault"`.
+On Windows the store uses DPAPI, so only the same Windows account can read it.
+On other platforms it uses Fernet with a `secrets.key` file. The app resolves
+the entry in memory when capture starts. Removing a camera also removes its
+secret. See `docs/release-checklist.md` for the verification steps.
+
 Each camera can override the global motion section with `[cameras.motion]`
 and define polygon zones:
 
@@ -296,7 +304,30 @@ criteria.
 Both produce `dist\Vigil\Vigil.exe` as a one-directory bundle. The CUDA
 script additionally copies CUDA runtime DLLs when it finds them and warns
 when one is missing. Models are not bundled. See `docs/packaging.md` for the
-build result on this machine and the Qt/ICU note.
+build details and the Qt/ICU note.
+
+Release artifacts:
+
+```powershell
+.\scripts\build_portable.ps1 -Version 2.0
+.\scripts\build_installer.ps1 -Version 2.0
+.\scripts\release_check.ps1 -ModelsDir "$env:LOCALAPPDATA\Vigil\models"
+```
+
+The portable script wraps the whole `dist\Vigil` folder in
+`dist\Vigil-portable-2.0.zip`. The installer script needs Inno Setup 6 (one
+`winget install JRSoftware.InnoSetup`) and writes
+`dist\installer\Vigil-2.0-setup.exe`. Both write a `.sha256` file. The release
+check starts the frozen app in an isolated data directory, fails on a fatal
+startup error or an `app.unhandled` log line, and, with `-ModelsDir`, confirms
+that the bundle selected the CNN backend on CUDA.
+
+## UI
+
+The operator console follows `docs/DESIGN.md`: grayscale surfaces, one green
+accent for active states and primary actions, red for alerts, square corners,
+and both a dark and a light scheme. Button positions and page logic are
+unchanged; the theme is a stylesheet plus square monochrome icons.
 
 ## Development
 

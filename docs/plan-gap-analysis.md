@@ -39,7 +39,7 @@ display path imports no dlib code. Guarded by
 
 | Item | State | Gap |
 |---|---|---|
-| CUDA 12.9, cuDNN 9, dlib-gpu 20.0.1 cp312 | Partial | Local verification used CPython 3.9.23, dlib 20.0.0, and a CUDA 11 runtime. The release target is not tested. |
+| CUDA 12.9, cuDNN 9, dlib-gpu 20.0.1 cp312 | Partial | The frozen CUDA bundle runs on the RTX 3050 here with dlib 20.0.0 and the CUDA 11 runtime: `dlib_cnn cuda=True cudnn=True ready on GPU`. The exact release versions on CPython 3.12 are still a target, not a recorded run. |
 | Startup CUDA probe | Done | `probe_backend` checks `DLIB_USE_CUDA`, `dlib.cuda.get_num_devices()`, and a best-effort cuDNN library probe. Missing CUDA or cuDNN switches the detector to HOG with a visible reason. |
 | Visible warning on CPU fallback | Done | Status bar and Diagnostics page show the backend reason in warning color. |
 | `inference.device` honored at runtime | Missing | The value is validated but dlib chooses its device from its own build. Documented as intent, not a runtime switch. |
@@ -55,7 +55,7 @@ display path imports no dlib code. Guarded by
 | SQLAlchemy 2.x and Alembic | Partial | SQLAlchemy Core is used. Alembic is a dev dependency only; the schema is created with `metadata.create_all`. |
 | Pydantic 2 and tomlkit | Done | Strict models and comment-preserving writes |
 | NumPy 2.x | Partial | The range allows 1.26 through 2.x. Local is 1.x. |
-| `cryptography` and `keyring` for camera secrets | Missing | Camera URLs are stored in plain TOML. No keyring or encrypted fallback exists. |
+| `cryptography` and `keyring` for camera secrets | Done | Credential-bearing camera URLs are encrypted at rest. Windows uses DPAPI; other platforms use Fernet with a key file. The TOML holds `source = "vault"`, and `tests/test_secrets.py` covers the round trip, the save path, a missing entry, and a corrupt store. `keyring` is not needed. |
 | PyInstaller 6.22.0, `--onedir` | Partial | Local 6.22.3, onedir works. |
 | No ONNX, FAISS, go2rtc, Telegram, SMTP | Done | None are present. |
 
@@ -135,16 +135,18 @@ validated but not editable in the UI, and there is no zone polygon editor.
 | Overlays with a one-second TTL | Done | `OverlayStore` |
 | No modal dialogs for common actions | Partial | Remove camera and delete person use `QMessageBox.question`. |
 | Dark/light follows the OS | Partial | The setting supports `system`, but the shipped default is `dark`. |
-| No custom skin | Deviation | The operator console has a deliberate dark theme and a teal live accent. |
+| No custom skin | Deviation | The operator console follows `docs/DESIGN.md`: grayscale surfaces, one green accent, red for alerts, square corners, and both dark and light schemes. The layout and controls are unchanged. |
 | Configuration applies without restart | Done | `AppContext.apply_config` rebuilds only affected workers and the Diagnostics page can reload the TOML file |
 
 ## 10. Packaging
 
 The `--onedir` bundle, CPU and CUDA scripts, explicit CUDA DLL collection,
 `multiprocessing.freeze_support()`, the Diagnostics page, and the cuDNN probe
-are present. Missing: Inno Setup installer, portable zip, a clean-VM test, and
-a CUDA test on the RTX 3050. The local bundle is 927 MB because it pulls CUDA 11
-cublas DLLs from dlib.
+are present. `scripts/build_portable.ps1` produces the portable zip and
+`scripts/build_installer.ps1` compiles `packaging/vigil.iss` with Inno Setup.
+`scripts/release_check.ps1` verifies the executable, the artifacts, an isolated
+start, the log, and the CUDA backend. The clean-VM test and the physical
+four-camera run remain manual steps in `docs/release-checklist.md`.
 
 ## 11. Sprint order
 
@@ -153,13 +155,17 @@ Steps 1 through 8 are implemented. Step 3 is partly closed:
 real capture thread, and decodes the frame at the display consumer. The
 residual deviation is that it reads `LatestFrame` rather than a screenshot of
 the Qt window; `tests/e2e/test_display.py` checks the offscreen paint path
-separately. Step 9 is partial: the CPU bundle was built and smoke tested on
-this machine, not on a clean VM. Step 10 is partial: the CUDA script exists,
-but the reference GPU run has not happened.
+separately. Step 9 is partial: the CPU bundle was built and checked here, but
+not on a clean VM. Step 10 is partial: the CUDA bundle starts on the RTX 3050
+and reports `dlib_cnn`, `cuda=True`, `cudnn=True`, and `ready on GPU`, but the
+exact CPython 3.12 and dlib 20.0.1 release stack is still untested.
 
 The sprint success criterion, four 1080p cameras with face recognition and a
-glass-to-glass p95 within 50 ms of the same setup without recognition, has not
-been demonstrated.
+glass-to-glass p95 within 50 ms of the same setup without recognition, was
+measured on the software path. `tools/four_camera_probe.py` ran the real dlib
+CNN backend on four 1920x1080 video cameras at 5 analysis fps: display p95 was
+62.0 ms with recognition, against 47.0 ms without inference load, a difference
+of 15 ms. The physical four-camera run is still manual.
 
 ## Deliberate deviations
 
@@ -184,14 +190,25 @@ been demonstrated.
 
 ## MVP blockers
 
-These are the gaps that still stop the plan's definition of done:
+These were the gaps that stopped the plan's definition of done:
 
-1. Camera secrets in the OS keyring or an encrypted fallback. `cryptography` is
-   installed; `keyring` is not, and the DPAPI design is not chosen.
+1. Camera secrets in the OS keyring or an encrypted fallback. **Closed.**
+   `save_config` moves a credential-bearing source into `secrets.json`,
+   encrypts it with DPAPI on Windows (Fernet elsewhere), and writes
+   `source = "vault"`. `AppContext` resolves the token for the capture thread
+   only. `tests/test_secrets.py` covers the save, load, delete, missing, and
+   corrupt-store paths.
 2. Verified CPU build on a clean Windows VM and a CUDA bundle run on the
-   RTX 3050.
-3. Installer and portable zip.
-4. Reference-hardware latency run with four 1080p cameras.
+   RTX 3050. **Half closed.** The CUDA bundle runs on the RTX 3050 and logs
+   `dlib_cnn cuda=True cudnn=True ready on GPU`. The clean Windows VM run is a
+   manual step in `docs/release-checklist.md`.
+3. Installer and portable zip. **Closed.** `dist\Vigil-portable-2.0.zip`
+   (635.7 MB) and `dist\installer\Vigil-2.0-setup.exe` (386.5 MB) were built,
+   each with a `.sha256` file. `scripts/release_check.ps1` passes every check.
+4. Reference-hardware latency run with four 1080p cameras. **Software half
+   closed.** The real CNN backend on four 1920x1080 video cameras measured a
+   display p95 of 62.0 ms, against 47.0 ms with no inference load. The physical
+   four-camera run remains manual.
 
 The closed blockers, one event per unknown visit, retention pruning, automatic
 CUDA and cuDNN fallback, the Diagnostics page, and recognition threshold

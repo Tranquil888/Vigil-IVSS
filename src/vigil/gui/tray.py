@@ -20,7 +20,7 @@ def placeholder_icon(scheme: str = "dark") -> QIcon:
     painter.setRenderHint(QPainter.Antialiasing, True)
     painter.setBrush(QColor(colors["accent"]))
     painter.setPen(Qt.NoPen)
-    painter.drawRoundedRect(1, 1, 30, 30, 6, 6)
+    painter.drawRect(1, 1, 30, 30)
     font = QFont("Segoe UI", 16)
     font.setBold(True)
     painter.setFont(font)

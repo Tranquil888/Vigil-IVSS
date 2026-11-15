@@ -18,6 +18,7 @@ from ..analysis.gallery import Gallery
 from ..analysis.pipeline import InferenceWorker, OverlayStore
 from ..analysis.unknowns import StrangerGrouper
 from ..config.models import VigilConfig
+from ..secrets import SecretStore, resolve_camera_sources
 from .bus import EventBus
 from ..notify.notifier import Notifier
 from ..paths import data_dir, db_path, models_for, people_dir, snapshots_dir
@@ -64,6 +65,17 @@ class AppContext:
         self._started = False
         self._shutdown_done = False
 
+        self.secrets = SecretStore(self.data_path)
+        try:
+            resolved = resolve_camera_sources(config, self.secrets)
+            if resolved:
+                log.info(
+                    "camera secrets loaded",
+                    extra={"event": "secrets.loaded", "detail": resolved},
+                )
+        except Exception:
+            log.exception("camera secrets could not be read")
+
         self.database = Database(db_path(config, self.data_path)).create()
         self.reader = Reader(self.database.path)
         self.bus = bus if bus is not None else EventBus()
@@ -96,6 +108,16 @@ class AppContext:
                 max_detect_side=config.face.max_detect_side,
             )
         self.status = self.backend.status
+        log.info(
+            "face backend selected: %s cuda=%s cudnn=%s %s"
+            % (
+                self.status.detector,
+                self.status.cuda,
+                getattr(self.status, "cudnn", False),
+                self.status.reason,
+            ),
+            extra={"event": "face.backend"},
+        )
 
         self.snapshots = SnapshotStore(
             snapshots_dir(config, self.data_path),
@@ -143,6 +165,10 @@ class AppContext:
         from ..config.loader import load_config
 
         fresh = load_config(Path(path))
+        try:
+            resolve_camera_sources(fresh, self.secrets)
+        except Exception:
+            log.exception("camera secrets could not be read on reload")
         for name in (
             "app",
             "inference",
@@ -257,6 +283,12 @@ class AppContext:
         vectors = self.embeddings.gallery(MODEL_ID)
         self.gallery.replace(vectors)
         return len(vectors)
+
+    def forget_camera_secret(self, camera_id: str) -> None:
+        try:
+            self.secrets.delete(camera_id)
+        except Exception:
+            log.exception("camera secret could not be removed")
 
     def remember_person(self, person_id: int, name: Optional[str]) -> None:
         """Keep the shared name map in step with people edits, for live lookups."""

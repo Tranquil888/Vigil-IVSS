@@ -19,6 +19,7 @@ dependencies = [
     "tomlkit>=0.12",
     "tomli>=2.0; python_version<'3.11'",
     "psutil>=5.9",
+    "cryptography>=42",
 ]
 
 [project.optional-dependencies]

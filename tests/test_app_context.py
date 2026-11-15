@@ -318,3 +318,27 @@ def test_start_seeds_the_camera_table(tmp_path):
         assert rows[0]["name"] == "Front door"
     finally:
         context.shutdown(timeout=1.0)
+
+
+def test_context_resolves_a_vault_camera_source(tmp_path):
+    from vigil.secrets import VAULT_SOURCE, SecretStore
+
+    rtsp = "rtsp://operator:s3cret@10.0.0.5/stream"
+    store = SecretStore(tmp_path)
+    store.set("front", rtsp)
+    config = build_config()
+    config.cameras[0].source = VAULT_SOURCE
+
+    seen = []
+    context = AppContext(
+        config,
+        data_path=tmp_path,
+        source_factory=lambda camera: seen.append(camera.source) or FakeSource(),
+        backend=FakeBackend(),
+    )
+    try:
+        assert context.config.cameras[0].source == rtsp
+        context.start()
+        assert seen and seen[0] == rtsp
+    finally:
+        context.shutdown(timeout=3.0)

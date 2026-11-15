@@ -71,3 +71,42 @@ def test_app_entry_enables_frozen_multiprocessing():
 def test_build_scripts_exist():
     for name in ("build_cpu.ps1", "build_cuda.ps1", "setup_env.ps1"):
         assert (ROOT / "scripts" / name).is_file()
+
+
+def test_portable_zip_script_wraps_the_onedir_bundle():
+    text = (ROOT / "scripts" / "build_portable.ps1").read_text(encoding="utf-8")
+
+    assert "Vigil.exe" in text
+    assert "ZipFile" in text
+    assert "Vigil-portable-" in text
+    assert "Get-FileHash" in text
+
+
+def test_installer_script_uses_inno_setup_without_downloading_it():
+    script = (ROOT / "scripts" / "build_installer.ps1").read_text(encoding="utf-8")
+    iss = (ROOT / "packaging" / "vigil.iss").read_text(encoding="utf-8")
+
+    assert "iscc" in script.lower()
+    assert "Inno Setup 6" in script
+    assert "Invoke-WebRequest" not in script
+    assert "dist\\Vigil\\*" in iss
+    assert "Vigil.exe" in iss
+
+
+def test_spec_collects_cryptography_for_the_secret_store():
+    spec = (ROOT / "packaging" / "vigil.spec").read_text(encoding="utf-8")
+
+    assert "cryptography" in spec
+
+
+def test_release_checklist_covers_the_manual_blockers():
+    text = (ROOT / "docs" / "release-checklist.md").read_text(encoding="utf-8")
+
+    for item in (
+        "Clean Windows VM",
+        "RTX 3050",
+        "four 1080p",
+        "Inno Setup",
+        "DPAPI",
+    ):
+        assert item in text

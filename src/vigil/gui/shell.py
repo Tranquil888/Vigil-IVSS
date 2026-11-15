@@ -52,28 +52,30 @@ def _nav_pixmap(kind: str, color: str, size: int = 40) -> QPixmap:
     painter.setBrush(Qt.NoBrush)
 
     if kind == "camera":
-        painter.drawRoundedRect(10, 14, 20, 14, 3, 3)
-        painter.drawEllipse(16, 17, 8, 8)
+        painter.drawRect(10, 14, 20, 14)
+        painter.drawRect(16, 18, 8, 6)
         painter.drawLine(16, 10, 24, 10)
     elif kind == "grid":
-        painter.drawRoundedRect(10, 10, 8, 8, 1, 1)
-        painter.drawRoundedRect(22, 10, 8, 8, 1, 1)
-        painter.drawRoundedRect(10, 22, 8, 8, 1, 1)
-        painter.drawRoundedRect(22, 22, 8, 8, 1, 1)
+        painter.drawRect(10, 10, 8, 8)
+        painter.drawRect(22, 10, 8, 8)
+        painter.drawRect(10, 22, 8, 8)
+        painter.drawRect(22, 22, 8, 8)
     elif kind == "list":
         for offset in (12, 20, 28):
             painter.drawLine(17, offset, 30, offset)
             painter.drawPoint(12, offset)
     elif kind == "person":
-        painter.drawEllipse(16, 11, 8, 8)
-        painter.drawArc(11, 21, 18, 12, 0, 180 * 16)
+        painter.drawRect(13, 10, 10, 10)
+        painter.drawLine(11, 26, 11, 22)
+        painter.drawLine(25, 26, 25, 22)
+        painter.drawLine(11, 26, 25, 26)
     elif kind == "sliders":
         for offset in (13, 20, 27):
             painter.drawLine(10, offset, 30, offset)
         painter.setBrush(QColor(color))
-        painter.drawEllipse(15, 10, 6, 6)
-        painter.drawEllipse(23, 17, 6, 6)
-        painter.drawEllipse(16, 24, 6, 6)
+        painter.drawRect(13, 10, 6, 6)
+        painter.drawRect(21, 17, 6, 6)
+        painter.drawRect(14, 24, 6, 6)
     elif kind == "pulse":
         painter.drawLine(10, 20, 15, 20)
         painter.drawLine(15, 20, 18, 13)
@@ -259,6 +261,7 @@ class MainWindow(QMainWindow):
         for button, (label, kind) in zip(self.nav_buttons, NAV):
             button.setIcon(_nav_icon(kind, self.scheme))
         self.live_page.set_scheme(self.scheme)
+        self.events_page.set_scheme(self.scheme)
         if hasattr(self, "tray"):
             self.tray.set_scheme(self.scheme)
 

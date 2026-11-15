@@ -22,11 +22,46 @@ Both scripts run `packaging/vigil.spec`. `build_cuda.ps1` calls
 `cublasLt64_12.dll` into `dist\Vigil\_internal` when it can find them. A
 missing DLL produces a warning, not a failed build.
 
+## Portable zip
+
+```powershell
+.\scripts\build_portable.ps1 -Version 2.0 -Force
+```
+
+The script wraps the whole `dist\Vigil` folder, not only the executable, in
+`dist\Vigil-portable-2.0.zip` and writes a `.sha256` file next to it. The zip
+keeps the `Vigil` folder as its root.
+
+## Installer
+
+```powershell
+winget install JRSoftware.InnoSetup
+.\scripts\build_installer.ps1 -Version 2.0
+```
+
+`packaging\vigil.iss` installs the bundle under `{autopf}\Vigil`, adds a Start
+menu entry, and offers an optional desktop shortcut. The script searches the
+usual Inno Setup locations, fails with instructions when `iscc.exe` is absent,
+and never downloads the compiler itself. The output is
+`dist\installer\Vigil-2.0-setup.exe` plus a `.sha256` file.
+
+## Release check
+
+```powershell
+.\scripts\release_check.ps1 -ModelsDir "$env:LOCALAPPDATA\Vigil\models"
+```
+
+The check verifies the executable, the bundle size, the portable zip, the
+installer, an isolated offscreen start, a clean stderr, the absence of
+`app.unhandled` in the run log, and, when `-ModelsDir` is given, that the
+frozen app selected the CNN backend on CUDA.
+
 The spec:
 
 - Builds one directory (`COLLECT`), not a one-file archive.
 - Uses `packaging/entry.py` as the script and `src` as the import path.
-- Collects `vigil`, `cv2`, `sqlalchemy`, `pydantic`, `tomlkit`, and `psutil`.
+- Collects `vigil`, `cv2`, `sqlalchemy`, `pydantic`, `tomlkit`, `psutil`, and
+  `cryptography`.
 - Collects `dlib` only when it imports in the build environment.
 - Bundles the checkmark PNGs under `vigil/gui/resources`.
 - Bundles the three CUDA DLLs when they are present in `CUDA_PATH`,

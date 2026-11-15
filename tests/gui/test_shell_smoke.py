@@ -66,9 +66,9 @@ def test_theme_switch_updates_the_stylesheet(qapp, tmp_path):
     window, _context = build_window(tmp_path)
     window.apply_scheme("light")
     assert window.scheme == "light"
-    assert "#F4F5F3" in window.styleSheet()
+    assert "#F2F3F2" in window.styleSheet()
     window.apply_scheme("dark")
-    assert "#12161A" in window.styleSheet()
+    assert "#0B0D0F" in window.styleSheet()
     window._quitting = True
     window.close()
 

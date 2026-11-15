@@ -92,8 +92,17 @@ def _apply(table: Any, data: Dict[str, Any]) -> None:
             table[key] = value
 
 
-def save_config(path: Path, config: VigilConfig) -> None:
-    data = config.model_dump(mode="json", exclude_none=True)
+def save_config(
+    path: Path, config: VigilConfig, secrets=None
+) -> None:
+    from ..secrets import SecretStore, protected_config, has_credentials
+
+    if secrets is None and any(
+        has_credentials(camera.source) for camera in config.cameras
+    ):
+        secrets = SecretStore(resolve_data_dir(config))
+    safe = protected_config(config, secrets) if secrets is not None else config
+    data = safe.model_dump(mode="json", exclude_none=True)
     document = tomlkit.document()
     if path.exists():
         try:

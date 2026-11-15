@@ -29,7 +29,15 @@ def collect(package):
 
 # PySide6 brings its own hook and a huge module set. Only the runtime support
 # packages and the pure Python dependencies are collected explicitly.
-for name in ("vigil", "cv2", "sqlalchemy", "pydantic", "tomlkit", "psutil"):
+for name in (
+    "vigil",
+    "cv2",
+    "sqlalchemy",
+    "pydantic",
+    "tomlkit",
+    "psutil",
+    "cryptography",
+):
     collect(name)
 
 hiddenimports.extend(collect_submodules("sqlalchemy.dialects.sqlite"))

@@ -213,6 +213,9 @@ class CamerasPage(Page):
         self.config.cameras = [
             item for item in self.config.cameras if item.id != camera.id
         ]
+        forget = getattr(self.context, "forget_camera_secret", None)
+        if callable(forget):
+            forget(camera.id)
         ok, message = self._persist()
         self.refresh()
         self._report(ok, message)
@@ -237,8 +240,11 @@ class CamerasPage(Page):
         self._report(ok, message)
 
     def _persist(self):
+        # Use the running context's store, so the config and the live secrets
+        # always live in the same data directory.
+        secrets = getattr(self.context, "secrets", None)
         try:
-            save_config(self.config_path, self.config)
+            save_config(self.config_path, self.config, secrets=secrets)
         except Exception as err:
             return False, "Could not write the config: %s" % err
         apply_config = getattr(self.context, "apply_config", None)

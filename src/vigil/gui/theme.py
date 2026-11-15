@@ -1,4 +1,9 @@
-"""Theme tokens and the single QSS builder for both schemes."""
+"""Theme tokens and the single QSS builder for both schemes.
+
+The palette follows docs/DESIGN.md: grayscale surfaces, one green accent for
+active states and primary actions, and red reserved for alerts. Every corner
+is square, and separators are one-pixel rules rather than shadows.
+"""
 
 from __future__ import annotations
 
@@ -6,34 +11,38 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 DARK = {
-    "bg": "#12161A",
-    "panel": "#1A2026",
-    "panel_alt": "#202832",
-    "line": "#2A323A",
-    "text": "#E6EDF3",
-    "muted": "#93A1AE",
-    "accent": "#2FB6A8",
-    "warn": "#E0A458",
-    "danger": "#E0605A",
-    "on_accent": "#0B1512",
+    "bg": "#0B0D0F",
+    "panel": "#15181B",
+    "panel_alt": "#1E2225",
+    "line": "#2E3337",
+    "text": "#E9ECEE",
+    "muted": "#A6ADB3",
+    "accent": "#34D058",
+    "accent_fill": "#34D058",
+    "warn": "#F05252",
+    "danger": "#F05252",
+    "on_accent": "#07110A",
 }
 
 LIGHT = {
-    "bg": "#F4F5F3",
+    "bg": "#F2F3F2",
     "panel": "#FFFFFF",
-    "panel_alt": "#ECEFEB",
-    "line": "#CBD2CC",
-    "text": "#1B232B",
-    "muted": "#5A6670",
-    "accent": "#0E786E",
-    "warn": "#8A5A12",
-    "danger": "#B33A34",
-    "on_accent": "#FFFFFF",
+    "panel_alt": "#E9EBE9",
+    "line": "#C7CBC7",
+    "text": "#15181A",
+    "muted": "#555C60",
+    "accent": "#0B6B2E",
+    "accent_fill": "#1FA84F",
+    "warn": "#B42318",
+    "danger": "#B42318",
+    "on_accent": "#07110A",
 }
 
 PALETTES: Dict[str, Dict[str, str]] = {"dark": DARK, "light": LIGHT}
 
 # Foreground and background token pairs that carry text or a control label.
+# A green fill is lighter than the green used for text, so the two have their
+# own pair: accent is readable as text, accent_fill carries dark text.
 TEXT_PAIRS: List[Tuple[str, str]] = [
     ("text", "bg"),
     ("text", "panel"),
@@ -47,7 +56,7 @@ TEXT_PAIRS: List[Tuple[str, str]] = [
     ("warn", "panel"),
     ("danger", "bg"),
     ("danger", "panel"),
-    ("on_accent", "accent"),
+    ("on_accent", "accent_fill"),
 ]
 
 
@@ -122,7 +131,7 @@ QLabel#FeedbackInfo {{
     background: {panel_alt};
     border: 1px solid {line};
     border-left: 3px solid {accent};
-    border-radius: 4px;
+    border-radius: 0;
     padding: 8px 10px;
     color: {text};
 }}
@@ -130,7 +139,7 @@ QLabel#FeedbackWarning {{
     background: {panel_alt};
     border: 1px solid {line};
     border-left: 3px solid {warn};
-    border-radius: 4px;
+    border-radius: 0;
     padding: 8px 10px;
     color: {text};
 }}
@@ -138,7 +147,7 @@ QLabel#FeedbackError {{
     background: {panel_alt};
     border: 1px solid {line};
     border-left: 3px solid {danger};
-    border-radius: 4px;
+    border-radius: 0;
     padding: 8px 10px;
     color: {text};
 }}
@@ -148,7 +157,7 @@ QLabel#Mono {{
 QFrame#Panel, QWidget#Panel {{
     background: {panel};
     border: 1px solid {line};
-    border-radius: 6px;
+    border-radius: 0;
 }}
 QWidget#Rail {{
     background: {panel};
@@ -163,7 +172,7 @@ QLabel#StatusWarn {{
 QToolButton#RailButton {{
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 6px;
+    border-radius: 0;
     padding: 8px 4px;
     color: {muted};
 }}
@@ -176,8 +185,8 @@ QToolButton#RailButton:pressed {{
     color: {text};
 }}
 QToolButton#RailButton:checked {{
-    background: {panel};
-    border-color: {line};
+    background: {panel_alt};
+    border-color: {accent};
     color: {accent};
 }}
 QToolButton#RailButton:focus {{
@@ -186,7 +195,7 @@ QToolButton#RailButton:focus {{
 QPushButton {{
     background: {panel_alt};
     border: 1px solid {line};
-    border-radius: 4px;
+    border-radius: 0;
     padding: 6px 12px;
     color: {text};
 }}
@@ -207,13 +216,16 @@ QPushButton:disabled {{
     color: {muted};
 }}
 QPushButton#Primary {{
-    background: {accent};
-    border-color: {accent};
+    background: {accent_fill};
+    border-color: {accent_fill};
     color: {on_accent};
     font-weight: 600;
 }}
+QPushButton#Primary:hover {{
+    border-color: {text};
+}}
 QPushButton#Primary:pressed {{
-    background: {accent};
+    background: {accent_fill};
     border-color: {text};
     color: {on_accent};
 }}
@@ -229,7 +241,7 @@ QPushButton#Danger:pressed {{
 QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QPlainTextEdit, QTextEdit {{
     background: {panel};
     border: 1px solid {line};
-    border-radius: 4px;
+    border-radius: 0;
     padding: 5px 8px;
     selection-background-color: {accent};
     selection-color: {on_accent};
@@ -253,7 +265,7 @@ QTableWidget, QTableView, QListWidget, QTreeWidget {{
     background: {panel};
     alternate-background-color: {panel_alt};
     border: 1px solid {line};
-    border-radius: 6px;
+    border-radius: 0;
     gridline-color: {line};
     selection-background-color: {panel_alt};
     selection-color: {text};
@@ -287,7 +299,7 @@ QScrollBar:vertical {{
 }}
 QScrollBar::handle:vertical {{
     background: {line};
-    border-radius: 5px;
+    border-radius: 0;
     min-height: 24px;
 }}
 QScrollBar::handle:vertical:hover {{
@@ -303,7 +315,7 @@ QScrollBar:horizontal {{
 }}
 QScrollBar::handle:horizontal {{
     background: {line};
-    border-radius: 5px;
+    border-radius: 0;
     min-width: 24px;
 }}
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
@@ -312,12 +324,12 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
 QProgressBar {{
     background: {panel};
     border: 1px solid {line};
-    border-radius: 4px;
+    border-radius: 0;
     text-align: center;
     color: {muted};
 }}
 QProgressBar::chunk {{
-    background: {accent};
+    background: {accent_fill};
 }}
 QCheckBox {{
     background: transparent;
@@ -326,7 +338,7 @@ QCheckBox::indicator {{
     width: 16px;
     height: 16px;
     border: 1px solid {line};
-    border-radius: 3px;
+    border-radius: 0;
     background: {panel};
 }}
 QCheckBox::indicator:checked {{
@@ -340,6 +352,33 @@ QCheckBox::indicator:checked:disabled {{
 }}
 QCheckBox::indicator:focus {{
     border-color: {accent};
+}}
+QRadioButton {{
+    background: transparent;
+}}
+QRadioButton::indicator {{
+    width: 14px;
+    height: 14px;
+    border: 1px solid {line};
+    border-radius: 0;
+    background: {panel};
+}}
+QRadioButton::indicator:checked {{
+    background: {accent};
+    border-color: {accent};
+}}
+QRadioButton::indicator:focus {{
+    border-color: {accent};
+}}
+QSlider::groove:horizontal {{
+    background: {line};
+    height: 2px;
+}}
+QSlider::handle:horizontal {{
+    background: {accent_fill};
+    width: 12px;
+    margin: -5px 0;
+    border-radius: 0;
 }}
 QToolTip {{
     background: {panel};
