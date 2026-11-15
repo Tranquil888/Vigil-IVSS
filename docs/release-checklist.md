@@ -33,8 +33,8 @@ token, the save path, a missing entry, and a corrupt store.
 
 ## 2. CPU build and CUDA bundle
 
-Status: portable and installer scripts are closed in software. The clean-VM
-run and the reference-GPU run are manual.
+Status: portable and installer scripts are closed in software. The reference-GPU
+run is recorded. A pristine Windows VM remains manual.
 
 CPU bundle:
 
@@ -42,6 +42,14 @@ CPU bundle:
 .\scripts\build_cpu.ps1 -Clean
 .\scripts\release_check.ps1
 ```
+
+Portable extraction check on this machine: the portable zip was extracted into
+an empty directory, `PATH` was reduced to `%SystemRoot%\System32;%SystemRoot%`,
+`PYTHONHOME` and `PYTHONPATH` were removed, and `Vigil.exe` was started. It
+stayed alive for 12 seconds and logged
+`face backend selected: dlib_cnn cuda=True cudnn=True ready on GPU` with no
+`app.unhandled` line. This proves the bundle does not need the development
+environment. It does not replace a pristine Windows install.
 
 Clean Windows VM: copy `dist\Vigil` or the portable zip to a machine with no
 Python, no conda, and no CUDA. Extract it, run `Vigil.exe`, add a camera, and

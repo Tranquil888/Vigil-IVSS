@@ -199,9 +199,11 @@ These were the gaps that stopped the plan's definition of done:
    only. `tests/test_secrets.py` covers the save, load, delete, missing, and
    corrupt-store paths.
 2. Verified CPU build on a clean Windows VM and a CUDA bundle run on the
-   RTX 3050. **Half closed.** The CUDA bundle runs on the RTX 3050 and logs
-   `dlib_cnn cuda=True cudnn=True ready on GPU`. The clean Windows VM run is a
-   manual step in `docs/release-checklist.md`.
+   RTX 3050. **Mostly closed.** The CUDA bundle runs on the RTX 3050 and logs
+   `dlib_cnn cuda=True cudnn=True ready on GPU`. The portable zip also starts
+   from an empty folder with `PATH` reduced to System32 and no Python
+   variables, and still selects the CNN backend on the GPU. The pristine
+   Windows VM run is the remaining manual step in `docs/release-checklist.md`.
 3. Installer and portable zip. **Closed.** `dist\Vigil-portable-2.0.zip`
    (541.9 MB) and `dist\installer\Vigil-2.0-setup.exe` (331.9 MB) were built
    from the current tree, each with a `.sha256` file.

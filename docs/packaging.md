@@ -102,7 +102,10 @@ the window, the Qt plugin load, and the backend probe all worked. No fatal
 exception appeared.
 
 That smoke test does not replace a click-through on a real display. Run the
-executable on the target machine before distributing it.
+executable on the target machine before distributing it. The portable zip was
+also extracted into an empty folder and started with `PATH` reduced to
+`%SystemRoot%\System32;%SystemRoot%` and no `PYTHONHOME` or `PYTHONPATH`; it
+stayed alive and selected the CNN backend on the GPU.
 
 ## Why PySide6 6.9.3 locally
 
