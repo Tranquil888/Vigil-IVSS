@@ -28,10 +28,12 @@ class CameraManager:
         config: VigilConfig,
         bus=None,
         source_factory: Optional[Callable[[CameraConfig], FrameSource]] = None,
+        on_camera_reset: Optional[Callable[[str], None]] = None,
     ) -> None:
         self.config = config
         self.bus = bus
         self._source_factory = source_factory
+        self._on_camera_reset = on_camera_reset
         self.inference_queue = DropOldestQueue(config.inference.queue_size)
         self._display: Dict[str, LatestFrame] = {}
         self._motion_queues: Dict[str, DropOldestQueue] = {}
@@ -77,6 +79,7 @@ class CameraManager:
                     source_factory=lambda camera=camera, factory=factory: factory(camera),
                     bus=self.bus,
                     motion_active=self._motion_active[camera.id],
+                    on_reconnect=self._on_reconnect,
                 )
             )
 
@@ -133,6 +136,16 @@ class CameraManager:
             event.set()
         else:
             event.clear()
+
+    def _on_reconnect(self, camera_id: str) -> None:
+        """A reopened stream starts with a fresh motion model and no tracklets."""
+        self.set_motion_active(camera_id, False)
+        for worker in self._motion_workers:
+            if worker.camera_id == camera_id:
+                worker.reset()
+                break
+        if self._on_camera_reset is not None:
+            self._on_camera_reset(camera_id)
 
     def _on_motion(self, camera_id: str, result, frame) -> None:
         self.set_motion_active(camera_id, result.active)

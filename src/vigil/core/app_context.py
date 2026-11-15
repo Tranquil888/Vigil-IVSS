@@ -123,7 +123,12 @@ class AppContext:
             snapshots_dir(config, self.data_path),
             jpeg_quality=config.storage.snapshot_jpeg_quality,
         )
-        self.manager = CameraManager(config, bus=self.bus, source_factory=source_factory)
+        self.manager = CameraManager(
+            config,
+            bus=self.bus,
+            source_factory=source_factory,
+            on_camera_reset=self._reset_camera_state,
+        )
         self.overlays = OverlayStore()
         grouper = StrangerGrouper(
             config.face.unknown_merge_window_s,
@@ -283,6 +288,12 @@ class AppContext:
         vectors = self.embeddings.gallery(MODEL_ID)
         self.gallery.replace(vectors)
         return len(vectors)
+
+    def _reset_camera_state(self, camera_id: str) -> None:
+        """Close this camera's tracklets after a reconnect."""
+        inference = getattr(self, "inference", None)
+        if inference is not None:
+            inference.request_camera_reset(camera_id)
 
     def forget_camera_secret(self, camera_id: str) -> None:
         try:

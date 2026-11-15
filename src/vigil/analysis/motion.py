@@ -178,6 +178,7 @@ class MotionWorker(threading.Thread):
         self.on_result = on_result
         self._factory = detector_factory or MotionDetector
         self._stop_event = threading.Event()
+        self._reset_event = threading.Event()
         self._detector = None
 
     def run(self) -> None:
@@ -186,6 +187,10 @@ class MotionWorker(threading.Thread):
             if frame is None:
                 continue
             try:
+                if self._reset_event.is_set():
+                    self._reset_event.clear()
+                    if self._detector is not None:
+                        self._detector.reset()
                 if self._detector is None:
                     self._detector = self._factory(
                         self.config,
@@ -205,8 +210,8 @@ class MotionWorker(threading.Thread):
                 )
 
     def reset(self) -> None:
-        if self._detector is not None:
-            self._detector.reset()
+        """Rebuild the background model on the worker's next frame."""
+        self._reset_event.set()
 
     def stop(self, timeout: float = 5.0) -> None:
         self._stop_event.set()

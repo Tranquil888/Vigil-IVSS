@@ -147,6 +147,8 @@ class InferenceWorker(threading.Thread):
         self._stop_event = threading.Event()
         self._finalised = False
         self._lock = threading.Lock()
+        self._reset_lock = threading.Lock()
+        self._reset_cameras: List[str] = []
         self._counters = {
             "frames": 0,
             "stale_frames": 0,
@@ -216,6 +218,36 @@ class InferenceWorker(threading.Thread):
     def set_backend(self, backend) -> None:
         self._backend = backend
 
+    def request_camera_reset(self, camera_id: str) -> None:
+        """Close this camera's tracklets on the worker thread.
+
+        A reconnect means the old frames are gone, so a track that happens to
+        land on the same pixels afterwards must not inherit the old votes.
+        """
+        with self._reset_lock:
+            if camera_id not in self._reset_cameras:
+                self._reset_cameras.append(camera_id)
+
+    def _drain_camera_resets(self) -> None:
+        with self._reset_lock:
+            pending = list(self._reset_cameras)
+            self._reset_cameras = []
+        if not pending:
+            return
+        events: List[EventRecord] = []
+        for camera_id in pending:
+            for key in [key for key in self._states if key[0] == camera_id]:
+                state = self._states.pop(key)
+                self._finalise(state, events)
+            if self._trackers.pop(camera_id, None) is not None:
+                # Dropping the tracker also drops its id counter, so the next
+                # tracklet starts fresh instead of reusing an old id.
+                log.debug(
+                    "tracklets closed after reconnect",
+                    extra={"event": "inference.reset", "camera_id": camera_id},
+                )
+        self._publish(events)
+
     def reconfigure(self, config: VigilConfig) -> None:
         """Adopt live config edits. Existing tracklets keep their state."""
         self._config = config
@@ -252,6 +284,8 @@ class InferenceWorker(threading.Thread):
                 if self._stop_event.is_set() or self._queue is None:
                     break
                 continue
+            # A reconnect request must land before the next frame is matched.
+            self._drain_camera_resets()
             age = self._clock() - frame.captured_at
             if age > self._config.inference.max_frame_age_s:
                 self._counters["stale_frames"] += 1

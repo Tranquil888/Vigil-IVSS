@@ -2,7 +2,7 @@
 
 Compared `Vigil_new_plan.md` with the tree at commit `a7c1b05` on
 `feat/3-rewrite-vigil`. Statuses were updated after the blocker pass on
-2026-11-13. The purpose is to separate what the MVP already proves, what is
+2026-11-15. The purpose is to separate what the MVP already proves, what is
 only partly built, and what was deliberately changed.
 
 Legend:
@@ -70,7 +70,7 @@ display path imports no dlib code. Guarded by
 | Inference queue bounded at 4, oldest dropped | Done | `DropOldestQueue` |
 | GUI reads newest frame only | Done | `VideoTile` timer |
 | Reconnect state machine and backoff | Done | `video/state.py`, `video/capture.py` |
-| Reconnect closes tracklets and resets motion | Missing | Neither is wired to a reconnect. Tracklets close by gap timeout; the MOG2 model keeps its old background. |
+| Reconnect closes tracklets and resets motion | Done | `CameraSupervisor` calls `on_reconnect` on the first open after an outage. The manager clears the motion gate and asks the motion worker to rebuild its background; the inference worker closes that camera's tracklets and drops its tracker before the next frame is matched. Covered by `tests/video/test_capture.py`, `tests/analysis/test_motion.py`, and `tests/analysis/test_pipeline.py`. |
 | GUI shows "No signal" over the last frame | Deviation | The tile blanks the image and draws "No signal". It does not keep the last frame behind the text. |
 
 ## 5. Face pipeline

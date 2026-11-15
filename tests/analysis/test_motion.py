@@ -121,3 +121,50 @@ def test_motion_worker_reports_a_trigger():
     finally:
         worker.stop()
     assert seen == [("front", True)]
+
+class ResettingDetector(FakeDetector):
+    def __init__(self):
+        self.resets = 0
+        self.updates = 0
+
+    def update(self, image, now):
+        self.updates += 1
+        return MotionResult(active=False)
+
+    def reset(self):
+        self.resets += 1
+
+
+def test_motion_worker_resets_the_background_on_its_own_thread():
+    import time
+
+    from vigil.analysis.motion import MotionWorker
+    from vigil.core.queues import DropOldestQueue
+    from vigil.core.records import Frame
+
+    queue = DropOldestQueue(4)
+    detector = ResettingDetector()
+    worker = MotionWorker(
+        camera_id="front",
+        queue=queue,
+        config=MotionConfig(),
+        zones=[],
+        on_result=lambda camera_id, result, frame: None,
+        detector_factory=lambda *args: detector,
+    )
+    worker.start()
+    try:
+        queue.put(Frame("front", 1, 0.0, 0.0, still_frame(), 160, 120))
+        deadline = time.monotonic() + 2
+        while detector.updates < 1 and time.monotonic() < deadline:
+            time.sleep(0.01)
+        worker.reset()
+        queue.put(Frame("front", 2, 0.1, 0.1, still_frame(), 160, 120))
+        deadline = time.monotonic() + 2
+        while detector.updates < 2 and time.monotonic() < deadline:
+            time.sleep(0.01)
+    finally:
+        worker.stop()
+
+    assert detector.updates == 2
+    assert detector.resets == 1

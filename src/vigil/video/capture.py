@@ -50,6 +50,7 @@ class CameraSupervisor(threading.Thread):
         motion_active: Optional[threading.Event] = None,
         max_frames: Optional[int] = None,
         clock: Callable[[], float] = time.monotonic,
+        on_reconnect: Optional[Callable[[str], None]] = None,
     ) -> None:
         super().__init__(name="capture-%s" % camera.id, daemon=True)
         self.camera = camera
@@ -64,6 +65,7 @@ class CameraSupervisor(threading.Thread):
         self._motion_active = motion_active or threading.Event()
         self._max_frames = max_frames
         self._clock = clock
+        self._on_reconnect = on_reconnect
         self._stop_event = threading.Event()
         self._sampler = FrameSampler(inference_config.analysis_fps)
         self._backoff = BackoffPolicy(
@@ -125,6 +127,8 @@ class CameraSupervisor(threading.Thread):
 
             self._set_state(CameraState.STREAMING)
             attempt = 0
+            if self._reconnects:
+                self._notify_reconnect()
             last_frame = self._clock()
             try:
                 while not self._stop_event.is_set():
@@ -197,6 +201,22 @@ class CameraSupervisor(threading.Thread):
         if self._motion_gate_open() and self._sampler.due(now):
             self._inference_queue.put(frame)
             self._inference_sent += 1
+
+    def _notify_reconnect(self) -> None:
+        """Tell the other workers that this camera came back after an outage."""
+        log.info(
+            "camera reconnected",
+            extra={"event": "camera.reconnected", "camera_id": self.camera.id},
+        )
+        if self._on_reconnect is None:
+            return
+        try:
+            self._on_reconnect(self.camera.id)
+        except Exception:
+            log.exception(
+                "camera reconnect hook failed",
+                extra={"event": "camera.reconnect_error", "camera_id": self.camera.id},
+            )
 
     def _publish_offline(self) -> None:
         if self._bus is None:

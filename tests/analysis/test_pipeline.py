@@ -167,3 +167,20 @@ def test_stop_finalises_open_tracklets():
     worker.stop()
     assert len(bus.records) == 1
     assert bus.records[0].type == "known_face"
+
+
+def test_a_reconnect_closes_only_that_cameras_tracklets():
+    gallery = Gallery()
+    gallery.add(1, unit([1, 0, 0]))
+    worker, bus = make_worker(FakeBackend(vector=[1, 0, 0]), gallery=gallery)
+
+    for index in range(3):
+        worker.process(frame(index, index * 0.2, camera_id="front"))
+        worker.process(frame(index, index * 0.2, camera_id="back"))
+
+    worker.request_camera_reset("front")
+    worker._drain_camera_resets()
+
+    assert [record.camera_id for record in bus.records] == ["front"]
+    assert not [key for key in worker._states if key[0] == "front"]
+    assert [key for key in worker._states if key[0] == "back"]

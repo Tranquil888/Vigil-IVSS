@@ -145,3 +145,52 @@ def test_stop_closes_the_supervisor():
     supervisor.stop(timeout=2.0)
     assert not supervisor.is_alive()
     assert supervisor.state == CameraState.CLOSED
+
+
+def test_the_reconnect_hook_fires_when_the_stream_returns():
+    seen = []
+    made = {"count": 0}
+
+    def factory():
+        made["count"] += 1
+        if made["count"] == 1:
+            return FakeSource(frame_count=1, open_failures=1)
+        return FakeSource(frame_count=2)
+
+    supervisor = CameraSupervisor(
+        camera=camera(),
+        capture_config=capture_config(),
+        motion_config=MotionConfig(enabled=False),
+        inference_config=inference_config(),
+        display=LatestFrame(),
+        motion_queue=DropOldestQueue(2),
+        inference_queue=DropOldestQueue(4),
+        source_factory=factory,
+        max_frames=2,
+        on_reconnect=seen.append,
+    )
+    supervisor.start()
+    supervisor.join(5.0)
+
+    assert made["count"] >= 2
+    assert seen == ["front"]
+
+
+def test_the_reconnect_hook_stays_quiet_on_the_first_open():
+    seen = []
+    supervisor = CameraSupervisor(
+        camera=camera(),
+        capture_config=capture_config(),
+        motion_config=MotionConfig(enabled=False),
+        inference_config=inference_config(),
+        display=LatestFrame(),
+        motion_queue=DropOldestQueue(2),
+        inference_queue=DropOldestQueue(4),
+        source_factory=lambda: FakeSource(frame_count=2),
+        max_frames=2,
+        on_reconnect=seen.append,
+    )
+    supervisor.start()
+    supervisor.join(5.0)
+
+    assert seen == []
