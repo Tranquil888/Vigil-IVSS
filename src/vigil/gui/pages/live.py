@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import math
 from typing import Dict, Optional
 
 from PySide6.QtWidgets import (
     QComboBox,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -32,6 +34,7 @@ class LivePage(Page):
         self.tiles: Dict[str, VideoTile] = {}
         self.single_tiles: Dict[str, VideoTile] = {}
         self._camera_ids = []
+        self._grid_shape = (0, 0)
 
         control = QHBoxLayout()
         control.setSpacing(6)
@@ -57,7 +60,7 @@ class LivePage(Page):
 
         self.modes = QStackedWidget()
         self.grid_host = QWidget()
-        self.grid_layout = QVBoxLayout(self.grid_host)
+        self.grid_layout = QGridLayout(self.grid_host)
         self.grid_layout.setContentsMargins(0, 0, 0, 0)
         self.grid_layout.setSpacing(10)
         self.single_host = QWidget()
@@ -129,7 +132,16 @@ class LivePage(Page):
             if widget is not None:
                 widget.deleteLater()
 
-        for camera_id in self._camera_ids:
+        # Stretches survive item removal, so clear the old shape first.
+        for row in range(self._grid_shape[0]):
+            self.grid_layout.setRowStretch(row, 0)
+        for column in range(self._grid_shape[1]):
+            self.grid_layout.setColumnStretch(column, 0)
+        columns = self._grid_columns(len(self._camera_ids))
+        rows = int(math.ceil(len(self._camera_ids) / float(columns)))
+        self._grid_shape = (rows, columns)
+
+        for index, camera_id in enumerate(self._camera_ids):
             try:
                 latest = self.context.manager.display_queue(camera_id)
             except Exception:
@@ -144,7 +156,10 @@ class LivePage(Page):
                 label=label,
             )
             self.tiles[camera_id] = tile
-            self.grid_layout.addWidget(tile, 1)
+            row, column = divmod(index, columns)
+            self.grid_layout.addWidget(tile, row, column)
+            self.grid_layout.setRowStretch(row, 1)
+            self.grid_layout.setColumnStretch(column, 1)
             single = VideoTile(
                 latest,
                 self.context.overlays,
@@ -160,6 +175,17 @@ class LivePage(Page):
         self.camera_combo.addItems(self._camera_ids)
         self.camera_combo.blockSignals(False)
         self._show_single(self.camera_combo.currentText())
+
+    @staticmethod
+    def _grid_columns(count: int) -> int:
+        """Pick a near-square grid.
+
+        One column made each 4:3 tile full width and short; a near-square
+        grid keeps every tile large in a 16:9 window.
+        """
+        if count < 1:
+            return 1
+        return max(1, int(math.ceil(math.sqrt(count))))
 
     def _show_single(self, camera_id: str) -> None:
         while self.single_slot.count():
