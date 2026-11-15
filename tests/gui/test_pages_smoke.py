@@ -140,3 +140,14 @@ def test_people_page_reports_a_failed_photo(window, monkeypatch, tmp_path):
         "Imported 1 photo(s), 0 already on file. 1 failed. bad.jpg: no face found"
     )
     assert page.feedback.objectName() == "FeedbackError"
+
+
+def test_events_page_marks_stranger_rows_for_the_green_bar(window):
+    from vigil.gui.pages.events import STRANGER_ROLE
+
+    page = window.events_page
+    assert page.table.item(0, 0).data(STRANGER_ROLE) is True
+
+    page.context.reader._events[0]["type"] = "known_face"
+    page.refresh()
+    assert not page.table.item(0, 0).data(STRANGER_ROLE)
