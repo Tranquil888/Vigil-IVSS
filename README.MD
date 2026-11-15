@@ -5,9 +5,29 @@ enrolled, logs what happened, and keeps the live view responsive while it
 does the recognition. Everything runs locally. There is no account, no
 cloud, and no network call after you download the model files.
 
-Version 2.0 is a rewrite of the old tkinter and `face_recognition`
-prototype in `legacy/`. The new application is PySide6, dlib, OpenCV, and
-SQLite, packaged as a single process with background workers.
+Version 2.0 is a rewrite of an earlier tkinter and `face_recognition`
+prototype. The new application is PySide6, dlib, OpenCV, and SQLite, packaged
+as a single process with background workers.
+
+## Screenshots
+
+The four feeds are ChokePoint test clips played from disk.
+
+![Live page with four cameras and recognition overlays](docs/images/live-grid.png)
+
+Four cameras on the Live page. Each tile paints from its own last-frame slot,
+so the display keeps its rate while the inference worker names the people in
+view.
+
+![Events page](docs/images/events.png)
+
+The Events page keeps one row per visit with camera, type, person, and score,
+and shows the full record underneath.
+
+![Settings page](docs/images/settings.png)
+
+The Settings page edits the TOML file in place. Camera, motion, zone, and
+inference changes apply without a restart.
 
 ## What 2.0 does
 
@@ -177,13 +197,13 @@ If you edit `config.toml` outside the app, use Reload config on the Diagnostics
 page. Adding a person, importing a photo, or disabling a person takes effect
 immediately.
 
-A password in a camera URL is never written to `config.toml`. Saving a source
+The camera secret store keeps a password out of `config.toml`. Saving a source
 such as `rtsp://user:password@host/stream` encrypts the full URL into
 `secrets.json` in the data directory and the config keeps `source = "vault"`.
 On Windows the store uses DPAPI, so only the same Windows account can read it.
 On other platforms it uses Fernet with a `secrets.key` file. The app resolves
 the entry in memory when capture starts. Removing a camera also removes its
-secret. See `docs/release-checklist.md` for the verification steps.
+secret.
 
 Each camera can override the global motion section with `[cameras.motion]`
 and define polygon zones:
@@ -386,10 +406,8 @@ real threads, and a real SQLite file, and need no camera or GPU:
 .\.venv\Scripts\python.exe -m pytest tests\e2e -q -m e2e
 ```
 
-The automated coverage, the gray-box checks, the manual hardware matrix, and
-the current blockers are in `docs/e2e-test-plan.md` and
-`docs/graybox-test-plan.md`. The comparison against the build plan is in
-`docs/plan-gap-analysis.md`.
+The automated coverage, the gray-box checks, and the manual hardware matrix are
+in `docs/e2e-test-plan.md` and `docs/graybox-test-plan.md`.
 
 Source layout:
 
@@ -407,7 +425,6 @@ src/vigil/
 tools/        latency harness
 scripts/      environment, model fetch, gray-box probe, recognition eval, build
 packaging/    PyInstaller spec and entry point
-legacy/       the old tkinter application, kept for reference
 ```
 
 `docs/architecture.md` explains the thread model and the queues.
@@ -417,7 +434,6 @@ legacy/       the old tkinter application, kept for reference
 `docs/e2e-test-plan.md` explains the end-to-end suite and the manual gates.
 `docs/graybox-test-plan.md` explains the queue, thread, database, backend, live
 reload, and dataset checks.
-`docs/plan-gap-analysis.md` lists what the build plan still needs.
 
 ## Troubleshooting
 
