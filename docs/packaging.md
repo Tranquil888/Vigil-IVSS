@@ -75,23 +75,25 @@ The spec:
 
 ## Result on this machine
 
-Recorded on 15 November 2026:
+Recorded on 16 November 2026:
 
 - PyInstaller 6.22.3, PyInstaller hooks 2026.10.
 - CPython 3.9.23 from a conda environment with a dlib build for CUDA.
 - PySide6-Essentials 6.9.3, OpenCV 4.12.0, dlib 20.0.0 with CUDA.
-- Build time: about 70 seconds with `--clean`.
-- Bundle size: about 939 MB. dlib, OpenCV, Qt, and the CUDA math libraries
-  account for most of it. The portable zip is 541.9 MB and the installer is
-  331.9 MB.
+- Bundle size: about 1200 MB. dlib, OpenCV, Qt, and the CUDA math libraries
+  account for most of it. The portable zip is 635.7 MB and the installer is
+  386.6 MB.
 - `dist\Vigil\_internal` contains the checkmark PNGs, the dlib package
   directory, `cudart64_110.dll`, `cudnn64_9.dll`, `cublas64_11.dll`, and
   `cublasLt64_11.dll`. The two cublas files alone are about 603 MB, because
   this machine has a CUDA 11 runtime and PyInstaller followed dlib's DLL
   dependencies. There is no `cublasLt64_12.dll`, because CUDA 12 is not
   installed. `build_cuda.ps1` reports that as a warning.
-- No ICU DLL is present in the bundle. The spec drops ICU files that come
-  from the conda prefix.
+- The bundle also contains `icuuc75.dll` (2.5 MB) and `icudt75.dll`
+  (29.3 MB). They came from another conda environment on `PATH`, not from the
+  build prefix, so the spec's ICU filter did not drop them. The build starts
+  and selects the CNN backend on CUDA with them present. No unversioned conda
+  `icuuc.dll`, the file behind the earlier `0xc0000139` failure, is present.
 
 The build was smoke tested by starting `Vigil.exe` with
 `QT_QPA_PLATFORM=offscreen`, waiting eight seconds, and checking that the
