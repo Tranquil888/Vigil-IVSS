@@ -16,10 +16,10 @@ need a real machine.
 | `scripts/eval_recognition.py` | Top-1 accuracy and genuine/impostor distances from a folder-per-person dataset |
 | `tests/e2e` | Real threads, real queues, real SQLite, no GPU |
 
-Use the verification interpreter:
+Use the interpreter from the environment you set up:
 
 ```powershell
-$py = "dlib-env\Scripts\python.exe"
+$py = ".venv\Scripts\python.exe"
 ```
 
 ## 1. Queue invariants

@@ -2,7 +2,7 @@
 
 Run them with:
 
-    dlib-env\\Scripts\\python.exe -m pytest tests/analysis/test_models.py -q -m models
+    .venv\\Scripts\\python.exe -m pytest tests/analysis/test_models.py -q -m models
 
 The directory can be overridden with ``VIGIL_MODELS_DIR``.
 """
