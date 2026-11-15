@@ -173,7 +173,7 @@ QToolButton#RailButton {{
     background: transparent;
     border: 1px solid transparent;
     border-radius: 0;
-    padding: 8px 4px;
+    padding: 8px 2px;
     color: {muted};
 }}
 QToolButton#RailButton:hover {{
