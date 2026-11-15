@@ -86,7 +86,7 @@ if (Test-Path $log) {
 
 Write-Host ""
 Write-Host "The clean-VM run and the four physical 1080p cameras remain manual steps."
-Write-Host "Use docs\release-checklist.md for the recorded procedure."
+Write-Host "The manual matrix is in docs\e2e-test-plan.md."
 if ($failures.Count -gt 0) {
     Write-Host "Failures: $($failures -join ', ')"
     exit 1

@@ -99,14 +99,8 @@ def test_spec_collects_cryptography_for_the_secret_store():
     assert "cryptography" in spec
 
 
-def test_release_checklist_covers_the_manual_blockers():
-    text = (ROOT / "docs" / "release-checklist.md").read_text(encoding="utf-8")
+def test_release_check_script_guards_the_frozen_startup():
+    text = (ROOT / "scripts" / "release_check.ps1").read_text(encoding="utf-8")
 
-    for item in (
-        "Clean Windows VM",
-        "RTX 3050",
-        "four 1080p",
-        "Inno Setup",
-        "DPAPI",
-    ):
+    for item in ("Vigil.exe", "Start-Process", "app.unhandled", "face.backend"):
         assert item in text

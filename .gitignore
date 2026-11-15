@@ -205,3 +205,14 @@ VigilDiagnostics-be-updated.txt
 
 # Local dlib model files, fetched with scripts/fetch_models.py
 /models/
+
+# Local development material, not part of the published tree
+/legacy/
+/Vigil_new_plan.md
+/.superpowers/
+/docs/superpowers/
+/docs/plan-gap-analysis.md
+/docs/release-checklist.md
+/docs/images/event-journal.png
+/docs/images/main-camera.png
+/docs/images/objects-tab.png

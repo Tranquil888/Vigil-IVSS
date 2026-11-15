@@ -5,8 +5,6 @@ the paths that only exist when a capture thread, the queues, the workers, the
 database, and the GUI run together. It is split into an automated suite that
 runs on any machine and a manual matrix for hardware and packaging gates.
 
-The comparison that produced this plan is in `docs/plan-gap-analysis.md`.
-
 ## Automated suite
 
 ```powershell
@@ -189,4 +187,3 @@ hardware, not because the harness is missing:
 The closed items, one unknown visit per row, retention pruning, CUDA and cuDNN
 fallback, the Diagnostics page, and recognition threshold calibration now have
 tests or a recorded probe run.
-The full list is in `docs/plan-gap-analysis.md`.
