@@ -1,6 +1,6 @@
 import pytest
 
-from tests.gui.fakes import FakeContext
+from tests.gui.fakes import FakeContext, FakeManager
 from vigil.config.models import CameraConfig, VigilConfig
 from vigil.gui.shell import MainWindow
 
@@ -51,6 +51,39 @@ def test_live_page_builds_a_tile_per_camera(window):
     page = window.live_page
     assert list(page.tiles) == ["front"]
     assert page.view.mode == "content"
+
+
+@pytest.mark.parametrize(
+    "count, expected",
+    [
+        (1, [(0, 0)]),
+        (2, [(0, 0), (0, 1)]),
+        (3, [(0, 0), (0, 1), (1, 0)]),
+        (4, [(0, 0), (0, 1), (1, 0), (1, 1)]),
+    ],
+)
+def test_live_page_places_tiles_in_a_grid(qapp, tmp_path, count, expected):
+    camera_ids = ["cam%d" % index for index in range(count)]
+    config = VigilConfig(
+        cameras=[
+            CameraConfig(id=camera_id, name=camera_id.title(), source="0")
+            for camera_id in camera_ids
+        ]
+    )
+    context = FakeContext(config)
+    context.manager = FakeManager(camera_ids)
+    window = MainWindow(context, config, config_path=tmp_path / "config.toml")
+    try:
+        page = window.live_page
+        positions = []
+        for camera_id in camera_ids:
+            index = page.grid_layout.indexOf(page.tiles[camera_id])
+            row, column, _, _ = page.grid_layout.getItemPosition(index)
+            positions.append((row, column))
+        assert positions == expected
+    finally:
+        window._quitting = True
+        window.close()
 
 
 def test_settings_page_has_a_reset_row_and_advanced_toggle(window):
